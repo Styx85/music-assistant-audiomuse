@@ -1,13 +1,15 @@
 # AudioMuse-AI for Music Assistant
 
-A [Music Assistant](https://music-assistant.io) plugin provider that uses a self-hosted
+A [Music Assistant](https://music-assistant.io) provider that uses a self-hosted
 [AudioMuse-AI](https://github.com/NeptuneHub/AudioMuse-AI) server for **similar tracks**.
 That powers Music Assistant's *Similar tracks*, **radio mode** and **autoplay "similar"**
 with AudioMuse-AI's sonic analysis (MusiCNN + CLAP).
 
-It works like Music Assistant's built-in *Sonic Similarity* plugin and runs next to it:
-by default Music Assistant asks AudioMuse-AI first and falls back to Sonic Similarity when
-AudioMuse-AI has no answer or is unreachable.
+It runs next to Music Assistant's other similarity sources (Last.fm, Sonic Similarity). It is
+a *metadata* provider: Music Assistant asks metadata providers for similar tracks before
+plugin providers, sorted by priority. With priority 10 it is asked before Last.fm (50) and
+Sonic Similarity (plugin), and Music Assistant falls back to those when AudioMuse-AI has no
+answer or is unreachable.
 
 > Status: **alpha**. Tested against a fake AudioMuse-AI server; first runs against a real
 > Music Assistant 2.10 / AudioMuse-AI setup are pending.
@@ -43,7 +45,7 @@ mount the `audiomuse` folder into it, e.g. in `compose.yml`:
 ```
 
 Check the Python version in the path for your image (`docker exec music-assistant ls /app/venv/lib`).
-Restart Music Assistant, then add **AudioMuse-AI** under *Settings → Plugins*.
+Restart Music Assistant, then add **AudioMuse-AI** under *Settings → Providers* (metadata).
 
 ### Setup
 
@@ -56,7 +58,7 @@ Restart Music Assistant, then add **AudioMuse-AI** under *Settings → Plugins*.
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| Prefer over other similarity plugins | on | ask AudioMuse-AI before e.g. Sonic Similarity |
+| Ask AudioMuse-AI first | on | priority 10 (before Last.fm and Sonic Similarity), otherwise 60 |
 | Limit songs per artist | AudioMuse-AI default | AudioMuse-AI `eliminate_duplicates` |
 | Also match mood | AudioMuse-AI default | AudioMuse-AI `mood_similarity` |
 | Look up unmatched tracks by artist and title | on | fallback for unknown seeds |

@@ -28,9 +28,9 @@ TRISTATE_OFF: Final = "off"
 OVERFETCH_FACTOR: Final = 2
 MAX_REQUEST_N: Final = 200
 
-# MA sorts plugin providers that support SIMILAR_TRACKS by this attribute (lower wins);
-# providers without the attribute count as 50 (see MusicAssistant.get_providers_supporting_feature).
-PRIORITY_PREFERRED: Final = 40
+# Metadata providers are asked for similar tracks in this order (lower first); Last.fm and
+# the other built-in metadata providers use 50 (see MetadataProvider.priority).
+PRIORITY_PREFERRED: Final = 10
 PRIORITY_DEFAULT: Final = 60
 
 REQUEST_TIMEOUT_SECONDS: Final = 30

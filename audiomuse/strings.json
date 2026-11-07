@@ -9,8 +9,8 @@
       "description": "The API_TOKEN configured in AudioMuse-AI (Bearer token for plugins)."
     },
     "prefer_over_builtin": {
-      "label": "Prefer over other similarity plugins",
-      "description": "Ask AudioMuse-AI before other plugins that offer similar tracks, such as Sonic Similarity. If AudioMuse-AI has no answer, Music Assistant still falls back to them."
+      "label": "Ask AudioMuse-AI first",
+      "description": "Ask AudioMuse-AI for similar tracks before Last.fm and Sonic Similarity. If AudioMuse-AI has no answer, Music Assistant still falls back to them."
     },
     "server_name": {
       "label": "AudioMuse-AI music server",

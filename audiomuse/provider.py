@@ -8,7 +8,7 @@ from music_assistant_models.config_entries import ConfigEntry, ConfigValueOption
 from music_assistant_models.enums import ConfigEntryType, ProviderFeature
 from music_assistant_models.errors import LoginFailed, ProviderUnavailableError, SetupFailedError
 
-from music_assistant.models.plugin import PluginProvider
+from music_assistant.models.metadata_provider import MetadataProvider
 
 from .client import AudioMuseAuthError, AudioMuseClient, AudioMuseError
 from .constants import (
@@ -39,8 +39,14 @@ if TYPE_CHECKING:
 SUPPORTED_FEATURES = {ProviderFeature.SIMILAR_TRACKS}
 
 
-class AudioMusePlugin(PluginProvider):
-    """Similar tracks (later also paths, text search, recommendations) from AudioMuse-AI."""
+class AudioMusePlugin(MetadataProvider):
+    """
+    Similar tracks (later also paths, text search, recommendations) from AudioMuse-AI.
+
+    A metadata provider rather than a plugin: Music Assistant asks metadata providers for
+    similar tracks before plugin providers, sorted by ``priority``, so this is the only way
+    to be asked before Last.fm (metadata, priority 50) and Sonic Similarity (plugin).
+    """
 
     def __init__(
         self,
@@ -53,12 +59,13 @@ class AudioMusePlugin(PluginProvider):
         super().__init__(mass, manifest, config, supported_features or SUPPORTED_FEATURES)
         self._client: AudioMuseClient
         self._service: SimilarTracksService[Track]
-        # read by MusicAssistant.get_providers_supporting_feature (lower wins)
-        self.priority = (
-            PRIORITY_PREFERRED
-            if bool(self.config.get_value(CONF_PREFER_OVER_BUILTIN))
-            else PRIORITY_DEFAULT
-        )
+
+    @property
+    def priority(self) -> int:
+        """Return the provider priority (lower = asked first, Last.fm uses 50)."""
+        if bool(self.config.get_value(CONF_PREFER_OVER_BUILTIN)):
+            return PRIORITY_PREFERRED
+        return PRIORITY_DEFAULT
 
     async def get_config_entries(self) -> tuple[ConfigEntry, ...]:
         """
