@@ -109,4 +109,5 @@ Code style follows Music Assistant (`AGENTS.md`): Sphinx docstrings, line length
 ## License
 
 Apache-2.0, like Music Assistant. This plugin only talks to AudioMuse-AI over HTTP and
-contains no AudioMuse-AI code (AudioMuse-AI is AGPL-3.0).
+contains no AudioMuse-AI code (AudioMuse-AI is AGPL-3.0). The icons are AudioMuse-AI's logo
+(from its repository), used to identify the integration.

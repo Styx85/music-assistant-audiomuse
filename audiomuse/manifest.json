@@ -13,6 +13,5 @@
   ],
   "documentation": "https://github.com/Styx85/music-assistant-audiomuse",
   "multi_instance": false,
-  "builtin": false,
-  "icon": "waveform"
+  "builtin": false
 }
