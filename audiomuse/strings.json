@@ -1,0 +1,50 @@
+{
+  "config_entries": {
+    "url": {
+      "label": "AudioMuse-AI URL",
+      "description": "Base URL of AudioMuse-AI, e.g. http://192.168.178.60:8000"
+    },
+    "api_token": {
+      "label": "API token",
+      "description": "The API_TOKEN configured in AudioMuse-AI (Bearer token for plugins)."
+    },
+    "prefer_over_builtin": {
+      "label": "Prefer over other similarity plugins",
+      "description": "Ask AudioMuse-AI before other plugins that offer similar tracks, such as Sonic Similarity. If AudioMuse-AI has no answer, Music Assistant still falls back to them."
+    },
+    "server_name": {
+      "label": "AudioMuse-AI music server",
+      "description": "Name of the music server configured in AudioMuse-AI. Leave empty for its default server. It must be the Music Assistant server, because results are Music Assistant library ids."
+    },
+    "verify_ssl": {
+      "label": "Verify SSL certificate"
+    },
+    "eliminate_duplicates": {
+      "label": "Limit songs per artist",
+      "options": {
+        "server_default": "AudioMuse-AI default",
+        "on": "On",
+        "off": "Off"
+      }
+    },
+    "mood_similarity": {
+      "label": "Also match mood",
+      "options": {
+        "server_default": "AudioMuse-AI default",
+        "on": "On",
+        "off": "Off"
+      }
+    },
+    "title_artist_fallback": {
+      "label": "Look up unmatched tracks by artist and title",
+      "description": "If AudioMuse-AI does not know the track (not analyzed yet, or a streaming track), ask it by artist and title instead."
+    },
+    "clear_api_token": {
+      "label": "Remove the saved API token",
+      "description": "Tick this if AudioMuse-AI no longer requires a token."
+    }
+  },
+  "manifest": {
+    "description": "Similar tracks and radio mode from a self-hosted AudioMuse-AI sonic analysis server."
+  }
+}

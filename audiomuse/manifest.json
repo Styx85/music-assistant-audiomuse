@@ -1,0 +1,18 @@
+{
+  "type": "plugin",
+  "domain": "audiomuse",
+  "stage": "alpha",
+  "name": "AudioMuse-AI",
+  "description": "Similar tracks and radio mode from a self-hosted AudioMuse-AI sonic analysis server.",
+  "codeowners": [
+    "@Styx85"
+  ],
+  "requirements": [],
+  "credits": [
+    "[AudioMuse-AI](https://github.com/NeptuneHub/AudioMuse-AI)"
+  ],
+  "documentation": "https://github.com/Styx85/music-assistant-audiomuse",
+  "multi_instance": false,
+  "builtin": false,
+  "icon": "waveform"
+}
