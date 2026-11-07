@@ -1,96 +1,118 @@
 # AudioMuse-AI for Music Assistant
 
-A [Music Assistant](https://music-assistant.io) provider that uses a self-hosted
-[AudioMuse-AI](https://github.com/NeptuneHub/AudioMuse-AI) server for **similar tracks**.
-That powers Music Assistant's *Similar tracks*, **radio mode** and **autoplay "similar"**
-with AudioMuse-AI's sonic analysis (MusiCNN + CLAP), plus:
+[Music Assistant](https://music-assistant.io) providers that bring a self-hosted
+[AudioMuse-AI](https://github.com/NeptuneHub/AudioMuse-AI) sonic analysis server into Music
+Assistant: similar tracks for **radio mode** and **autoplay**, a **discover row**, and
+**free-text search** by sound ("calm piano in the evening").
 
-- a discover row **"Inspired by recently played"** (tracks similar to what you played last),
-- **free-text search** by sound ("calm piano in the evening") via the companion
-  `audiomuse_search` plugin,
-- a **status line** in the settings (songs analyzed, text index, running analysis).
+## Status
 
-It runs next to Music Assistant's other similarity sources (Last.fm, Sonic Similarity). It is
-a *metadata* provider: Music Assistant asks metadata providers for similar tracks before
-plugin providers, sorted by priority. With priority 10 it is asked before Last.fm (50) and
-Sonic Similarity (plugin), and Music Assistant falls back to those when AudioMuse-AI has no
-answer or is unreachable. The provider walks a ranked fallback list itself (default: Sonic Similarity), so Last.fm
-is only used when none of the chosen sources has an answer.
+**Alpha**, running on one home setup (Music Assistant 2.10.9, AudioMuse-AI 3.7.1).
 
-> Status: **alpha**. Tested against a fake AudioMuse-AI server; first runs against a real
-> Music Assistant 2.10 / AudioMuse-AI setup are pending.
+| Feature | State |
+| --- | --- |
+| Similar tracks / radio / autoplay | working against a real Music Assistant; results from AudioMuse-AI once its first analysis has built the index |
+| Ranked fallback (e.g. Sonic Similarity, Last.fm, Spotify) | working |
+| Discover row "Inspired by recently played" | working |
+| Free-text search (`audiomuse_search`) | working |
+| Status line, English and German UI | working |
+| More similarity options, song path, alchemy | planned |
 
-## How it fits together
-
-AudioMuse-AI normally analyzes music through Jellyfin, Navidrome, Plex, Emby or Lyrion.
-This plugin expects AudioMuse-AI to analyze the **Music Assistant library itself**, using the
-`musicassistant` server type from
+Needs AudioMuse-AI with the **Music Assistant server type**, which is not upstream yet:
 [Styx85/AudioMuse-AI, branch `music-assistant-server`](https://github.com/Styx85/AudioMuse-AI/tree/music-assistant-server)
-(proposed upstream). With that, AudioMuse-AI's track ids *are* Music Assistant library ids,
-so no matching between two libraries is needed:
+(planned as a pull request to AudioMuse-AI).
+
+## Concept
 
 ```
-Music Assistant ──(JSON API: library, playlists)──► AudioMuse-AI ◄── shared music folder (read-only)
-      ▲                                                 │
-      └──── this plugin: /api/similar_tracks?item_id=<MA library id> ──┘
+Music Assistant ──(JSON API: library, playlists, play counts)──► AudioMuse-AI
+      ▲                                                          │  reads audio from the
+      │   similar tracks / search / discover                     │  shared music folder
+      └──────────── these providers ◄──── library ids ───────────┘  (read-only)
 ```
 
-AudioMuse-AI reads the audio of Music Assistant's local **filesystem** providers straight
-from a shared folder; Music Assistant has (by design) no download endpoint. Streaming-service
-tracks are not analyzed. If a seed track is unknown to AudioMuse-AI, the plugin can fall back
-to asking by artist and title.
+- **AudioMuse-AI analyzes the Music Assistant library directly** (server type
+  `musicassistant`): it lists tracks through Music Assistant's API and reads the audio of the
+  local filesystem providers from the same music folder. No Jellyfin, Navidrome or Plex in
+  between, and AudioMuse-AI's track ids *are* Music Assistant library ids, so no matching.
+- **`audiomuse`** (metadata provider) answers *similar tracks*. Music Assistant asks metadata
+  providers before plugins, by priority; with priority 10 AudioMuse-AI comes before Last.fm
+  (50) and Sonic Similarity (plugin). Without an answer from AudioMuse-AI it asks your ranked
+  fallbacks (default: Sonic Similarity); only if all are empty does Music Assistant continue
+  with its remaining providers.
+- **`audiomuse_search`** (plugin) adds free-text search: Music Assistant's global search only
+  asks plugin providers. It has no settings and uses the main provider's connection.
+- Streaming-service tracks are not analyzed (Music Assistant has, by design, no download
+  endpoint). For them the provider can fall back to asking AudioMuse-AI by artist and title.
 
-## Install (manual, until it is part of Music Assistant)
+## Installation
 
-Music Assistant only loads providers from its own package folder. For the Docker image,
-mount both folders of this repo into it, e.g. in `compose.yml`:
+### 1. AudioMuse-AI with the Music Assistant server type
+
+Run AudioMuse-AI (Flask, worker, PostgreSQL; ~8 GB RAM, AVX2) from the fork above, e.g. by
+layering the fork's code over the official 3.7.1 image:
+
+```dockerfile
+FROM ghcr.io/neptunehub/audiomuse-ai:3.7.1
+COPY . /app
+```
+
+```bash
+git clone --branch music-assistant-server https://github.com/Styx85/AudioMuse-AI.git src
+docker build -f Dockerfile -t audiomuse-ai-ma:local src
+```
+
+Use `audiomuse-ai-ma:local` for the `audiomuse-ai-flask` and `audiomuse-ai-worker` services of
+AudioMuse-AI's `deployment/docker-compose.yaml`, and mount the music folder of Music
+Assistant's filesystem provider into **both** services, read-only:
 
 ```yaml
     volumes:
-      - ./music-assistant-audiomuse/audiomuse:/app/venv/lib/python3.14/site-packages/music_assistant/providers/audiomuse:ro
-      - ./music-assistant-audiomuse/audiomuse_search:/app/venv/lib/python3.14/site-packages/music_assistant/providers/audiomuse_search:ro
+      - /path/to/music:/music:ro
 ```
 
-`audiomuse_search` is optional. It exists because Music Assistant's global search only asks
-plugin providers, while the main provider must be a metadata provider (see above). It has no
-settings and uses the main provider's connection.
+Set `API_TOKEN` in AudioMuse-AI (the providers authenticate with it).
 
-Check the Python version in the path for your image (`docker exec music-assistant ls /app/venv/lib`).
-Restart Music Assistant, then add **AudioMuse-AI** under *Settings → Providers* (metadata)
-and, for text search, **AudioMuse-AI Text Search** (plugin).
+### 2. Connect AudioMuse-AI to Music Assistant
 
-### Setup
+1. In Music Assistant create a long-lived access token (your profile → tokens).
+2. In AudioMuse-AI: *Setup → Music Servers → add* type **Music Assistant** with
+   URL `http://<music-assistant>:8095`, the token and music folder `/music`.
+   *Test connection* warns if the files are not readable.
+3. Start an analysis (for a first test e.g. only the 50 most recent albums). AudioMuse-AI builds
+   its similarity index at the end of the run.
 
-- **AudioMuse-AI URL**, e.g. `http://audiomuse:8000`
-- **API token**: AudioMuse-AI's `API_TOKEN` (stored encrypted)
-- **AudioMuse-AI music server** (advanced): leave empty if the Music Assistant server is
-  AudioMuse-AI's default server, otherwise its name
+### 3. Install the providers in Music Assistant
 
-### Options
+Music Assistant only loads providers from its own package folder. With the Docker image, clone
+this repository next to your `compose.yml` and mount both folders:
 
-| Option | Default | Meaning |
+```bash
+git clone https://github.com/Styx85/music-assistant-audiomuse.git providers-src/audiomuse
+```
+
+```yaml
+    volumes:
+      - ./providers-src/audiomuse/audiomuse:/app/venv/lib/python3.14/site-packages/music_assistant/providers/audiomuse:ro
+      - ./providers-src/audiomuse/audiomuse_search:/app/venv/lib/python3.14/site-packages/music_assistant/providers/audiomuse_search:ro
+```
+
+Check the Python version in the path (`docker exec music-assistant ls /app/venv/lib`), then
+`docker compose up -d`. Update later with `git -C providers-src/audiomuse pull` and a restart.
+
+### 4. Set up the providers
+
+- *Settings → Providers → add* **AudioMuse-AI** (metadata): URL `http://<audiomuse>:8000`,
+  API token = AudioMuse-AI's `API_TOKEN`.
+- Optionally add **AudioMuse-AI Text Search** (plugin) for free-text search.
+
+| Option | Default | |
 | --- | --- | --- |
-| Ask AudioMuse-AI first | on | priority 10 (before Last.fm and Sonic Similarity), otherwise 60 |
-| Fallback 1 / 2 / 3 | Sonic Similarity / none / none | ranked sources asked when AudioMuse-AI has no answer: any provider that offers similar tracks (Sonic Similarity, Last.fm, Spotify, ...). The first with results wins; if all are empty, Music Assistant asks its remaining providers itself |
-| Limit songs per artist | AudioMuse-AI default | AudioMuse-AI `eliminate_duplicates` |
-| Also match mood | AudioMuse-AI default | AudioMuse-AI `mood_similarity` |
-| Look up unmatched tracks by artist and title | on | fallback for unknown seeds |
-| Show "Inspired by recently played" | on | discover row from the last 5 played tracks (cached 5 min) |
-
-## Behaviour and errors
-
-- Asks AudioMuse-AI for `2 × limit + 1` neighbours (max 200), drops the seed and duplicates,
-  loads the results from the library and skips ids that are no longer there.
-- Unreachable AudioMuse-AI, bad token, timeouts, 5xx → `ProviderUnavailableError`, so
-  Music Assistant logs it and uses the next similarity provider.
-- Unknown seed (404) → artist/title fallback, otherwise an empty result.
-- Error messages from AudioMuse-AI are passed on with the API token redacted.
-
-## Roadmap
-
-1. Similar tracks / radio / autoplay, discover row, free-text search, status (this release)
-2. More similarity options (radius walk, mood anchors), song path between two tracks
-3. Alchemy, sonic fingerprint, mood playlists
+| Ask AudioMuse-AI first | on | priority 10 (before Last.fm), otherwise 60 |
+| Fallback 1 / 2 / 3 | Sonic Similarity / none / none | ranked sources when AudioMuse-AI has no answer |
+| Show "Inspired by recently played" | on | discover row from your last 5 played tracks |
+| Limit songs per artist, Also match mood | AudioMuse-AI default | passed to AudioMuse-AI |
+| Look up unmatched tracks by artist and title | on | for tracks AudioMuse-AI does not know |
 
 ## Development
 
@@ -99,15 +121,17 @@ pip install aiohttp pytest
 python -m pytest -q
 ```
 
-The tests run without Music Assistant: the package is loaded without its `__init__.py`, and a
-fake AudioMuse-AI server (aiohttp) covers auth, parameters, errors and parsing. `provider.py`
-and `setup_flow.py` need a Music Assistant development environment
-(see Music Assistant's `DEVELOPMENT.md`) and are not covered yet.
+Tests run without Music Assistant against a fake AudioMuse-AI server. `provider.py`,
+`setup_flow.py` and the `__init__` modules need a Music Assistant development environment and
+are verified on a live install. Code style follows Music Assistant (Sphinx docstrings, line
+length 100).
 
-Code style follows Music Assistant (`AGENTS.md`): Sphinx docstrings, line length 100.
+Until the providers are part of Music Assistant, they register their texts (English, German) in
+Music Assistant's translation controller at runtime, because Music Assistant only compiles
+translations of built-in providers.
 
 ## License
 
-Apache-2.0, like Music Assistant. This plugin only talks to AudioMuse-AI over HTTP and
-contains no AudioMuse-AI code (AudioMuse-AI is AGPL-3.0). The icons are AudioMuse-AI's logo
-(from its repository), used to identify the integration.
+Apache-2.0, like Music Assistant. The providers only talk to AudioMuse-AI over HTTP and contain
+no AudioMuse-AI code (AudioMuse-AI is AGPL-3.0). The icons are AudioMuse-AI's logo, used to
+identify the integration.
