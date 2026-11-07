@@ -16,9 +16,26 @@
       "label": "AudioMuse-AI zuerst fragen",
       "description": "Ähnliche Titel zuerst bei AudioMuse-AI anfragen, vor Last.fm und Sonic Similarity. Hat AudioMuse-AI keine Antwort, fällt Music Assistant auf diese zurück."
     },
-    "sonic_fallback": {
-      "label": "Rückfall auf Sonic Similarity statt Last.fm",
-      "description": "Hat AudioMuse-AI keine Antwort (Titel noch nicht analysiert, Index noch nicht gebaut, Server nicht erreichbar), wird direkt Sonic Similarity gefragt. Last.fm kommt dann nur noch zum Zug, wenn beide nichts haben."
+    "fallback_1": {
+      "label": "Rückfall 1",
+      "description": "Werden in dieser Reihenfolge gefragt, wenn AudioMuse-AI keine Antwort hat (Titel nicht analysiert, Index noch nicht gebaut, Server nicht erreichbar). Die erste Quelle mit Ergebnissen gewinnt. Bleiben alle leer, fragt Music Assistant seine übrigen Provider (z. B. Last.fm) selbst.",
+      "options": {
+        "none": "Keiner"
+      }
+    },
+    "fallback_2": {
+      "label": "Rückfall 2",
+      "description": "Werden in dieser Reihenfolge gefragt, wenn AudioMuse-AI keine Antwort hat (Titel nicht analysiert, Index noch nicht gebaut, Server nicht erreichbar). Die erste Quelle mit Ergebnissen gewinnt. Bleiben alle leer, fragt Music Assistant seine übrigen Provider (z. B. Last.fm) selbst.",
+      "options": {
+        "none": "Keiner"
+      }
+    },
+    "fallback_3": {
+      "label": "Rückfall 3",
+      "description": "Werden in dieser Reihenfolge gefragt, wenn AudioMuse-AI keine Antwort hat (Titel nicht analysiert, Index noch nicht gebaut, Server nicht erreichbar). Die erste Quelle mit Ergebnissen gewinnt. Bleiben alle leer, fragt Music Assistant seine übrigen Provider (z. B. Last.fm) selbst.",
+      "options": {
+        "none": "Keiner"
+      }
     },
     "server_name": {
       "label": "AudioMuse-AI-Musikserver",
@@ -56,7 +73,8 @@
   },
   "config_categories": {
     "discover": "Entdecken",
-    "status": "Status"
+    "status": "Status",
+    "fallback": "Rückfall, wenn AudioMuse-AI keine Antwort hat"
   },
   "manifest": {
     "description": "Ähnliche Titel und Radio-Modus von einem selbst betriebenen AudioMuse-AI-Klanganalyse-Server."

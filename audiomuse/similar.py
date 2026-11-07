@@ -245,19 +245,19 @@ class SimilarTracksService(Generic[T]):
         return list(await asyncio.gather(*(_load(item_id) for item_id in ids)))
 
 
-async def with_fallback(
+async def with_fallbacks(
     primary: Callable[[], Awaitable[list[T]]],
-    fallback: Callable[[], Awaitable[list[T]]] | None,
+    fallbacks: list[tuple[str, Callable[[], Awaitable[list[T]]]]],
 ) -> tuple[list[T], str, AudioMuseError | None]:
     """
-    Return the primary result, or the fallback's when the primary has none or fails.
+    Return the primary result, or the first non-empty fallback result, in order.
 
     :param primary: Asks AudioMuse-AI; may raise AudioMuseError.
-    :param fallback: Asks another source (e.g. Sonic Similarity); None disables it. It must
-        not raise for expected failures and return an empty list instead.
-    :return: The tracks, their source ("audiomuse", "fallback" or "none") and the
+    :param fallbacks: ``(name, ask)`` pairs in ranking order (e.g. Sonic Similarity, Last.fm).
+        Each ``ask`` must not raise for expected failures and return an empty list instead.
+    :return: The tracks, their source ("audiomuse", a fallback name or "none") and the
         AudioMuse-AI error that led to the fallback, if any.
-    :raises AudioMuseError: The primary error, when neither source has an answer.
+    :raises AudioMuseError: The primary error, when no source has an answer.
     """
     error: AudioMuseError | None = None
     try:
@@ -266,8 +266,9 @@ async def with_fallback(
         tracks, error = [], err
     if tracks:
         return tracks, "audiomuse", None
-    if fallback is not None and (other := await fallback()):
-        return other, "fallback", error
+    for name, ask in fallbacks:
+        if other := await ask():
+            return other, name, error
     if error is not None:
         raise error
     return [], "none", None

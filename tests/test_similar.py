@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import pytest
 
 from audiomuse.client import AudioMuseNotFoundError, AudioMuseUnavailableError, SimilarTrack
-from audiomuse.similar import SeedRef, SimilarOptions, SimilarTracksService, with_fallback
+from audiomuse.similar import SeedRef, SimilarOptions, SimilarTracksService, with_fallbacks
 
 
 def _row(item_id: str) -> SimilarTrack:
@@ -202,44 +202,48 @@ def test_inspired_by_raises_when_every_seed_fails(run) -> None:
         run(service.inspired_by([SeedRef("a", ["A"], "1")], limit=5, per_seed=5))
 
 
-def test_with_fallback_prefers_audiomuse(run) -> None:
+def test_with_fallbacks_prefers_audiomuse(run) -> None:
     async def primary():
         return ["a"]
 
-    async def fallback():
+    async def never():
         raise AssertionError("must not be asked")
 
-    assert run(with_fallback(primary, fallback)) == (["a"], "audiomuse", None)
+    assert run(with_fallbacks(primary, [("sonic", never)])) == (["a"], "audiomuse", None)
 
 
-def test_with_fallback_used_when_audiomuse_empty_or_failing(run) -> None:
-    async def empty():
-        return []
+def test_with_fallbacks_walks_the_ranking_in_order(run) -> None:
+    asked: list[str] = []
+
+    def source(name, result):
+        async def _ask():
+            asked.append(name)
+            return result
+
+        return (name, _ask)
 
     async def failing():
         raise AudioMuseUnavailableError("index empty", 503)
 
-    async def sonic():
-        return ["s"]
-
-    assert run(with_fallback(empty, sonic)) == (["s"], "fallback", None)
-    tracks, source, error = run(with_fallback(failing, sonic))
-    assert (tracks, source) == (["s"], "fallback")
+    tracks, source_name, error = run(
+        with_fallbacks(
+            failing, [source("sonic", []), source("spotify", ["s"]), source("lastfm", ["l"])]
+        )
+    )
+    assert (tracks, source_name) == (["s"], "spotify")
     assert isinstance(error, AudioMuseUnavailableError)
+    assert asked == ["sonic", "spotify"]
 
 
-def test_with_fallback_keeps_error_when_nothing_answers(run) -> None:
+def test_with_fallbacks_keeps_error_when_nothing_answers(run) -> None:
     async def failing():
         raise AudioMuseUnavailableError("down", 503)
-
-    async def nothing():
-        return []
 
     async def empty():
         return []
 
     with pytest.raises(AudioMuseUnavailableError):
-        run(with_fallback(failing, nothing))
+        run(with_fallbacks(failing, [("sonic", empty)]))
     with pytest.raises(AudioMuseUnavailableError):
-        run(with_fallback(failing, None))
-    assert run(with_fallback(empty, None)) == ([], "none", None)
+        run(with_fallbacks(failing, []))
+    assert run(with_fallbacks(empty, [])) == ([], "none", None)

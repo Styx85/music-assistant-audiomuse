@@ -12,9 +12,26 @@
       "label": "Ask AudioMuse-AI first",
       "description": "Ask AudioMuse-AI for similar tracks before Last.fm and Sonic Similarity. If AudioMuse-AI has no answer, Music Assistant still falls back to them."
     },
-    "sonic_fallback": {
-      "label": "Fall back to Sonic Similarity instead of Last.fm",
-      "description": "If AudioMuse-AI has no answer (track not analyzed yet, index not built, server unreachable), ask Sonic Similarity directly, so Last.fm is only used when both have nothing."
+    "fallback_1": {
+      "label": "Fallback 1",
+      "description": "Asked in this order when AudioMuse-AI has no answer (track not analyzed, index not built, server unreachable). The first source with results wins. If all are empty, Music Assistant asks its remaining providers (e.g. Last.fm) itself.",
+      "options": {
+        "none": "None"
+      }
+    },
+    "fallback_2": {
+      "label": "Fallback 2",
+      "description": "Asked in this order when AudioMuse-AI has no answer (track not analyzed, index not built, server unreachable). The first source with results wins. If all are empty, Music Assistant asks its remaining providers (e.g. Last.fm) itself.",
+      "options": {
+        "none": "None"
+      }
+    },
+    "fallback_3": {
+      "label": "Fallback 3",
+      "description": "Asked in this order when AudioMuse-AI has no answer (track not analyzed, index not built, server unreachable). The first source with results wins. If all are empty, Music Assistant asks its remaining providers (e.g. Last.fm) itself.",
+      "options": {
+        "none": "None"
+      }
     },
     "server_name": {
       "label": "AudioMuse-AI music server",
@@ -59,6 +76,7 @@
   },
   "config_categories": {
     "discover": "Discover",
-    "status": "Status"
+    "status": "Status",
+    "fallback": "Fallback when AudioMuse-AI has no answer"
   }
 }

@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import time
 from typing import TYPE_CHECKING
 
 from aiohttp import ClientError
 
 from music_assistant_models.config_entries import ConfigEntry, ConfigValueOption
-from music_assistant_models.enums import ConfigEntryType, MediaType, ProviderFeature
+from music_assistant_models.enums import ConfigEntryType, MediaType, ProviderFeature, ProviderType
 from music_assistant_models.errors import (
     LoginFailed,
     MusicAssistantError,
@@ -19,6 +20,7 @@ from music_assistant_models.errors import (
 from music_assistant_models.media_items import RecommendationFolder, UniqueList
 
 from music_assistant.models.metadata_provider import MetadataProvider
+from music_assistant.models.music_provider import MusicProvider
 
 from .client import AudioMuseAuthError, AudioMuseClient, AudioMuseError
 from .constants import (
@@ -28,8 +30,8 @@ from .constants import (
     CONF_LABEL_STATUS,
     CONF_MOOD_SIMILARITY,
     CONF_PREFER_OVER_BUILTIN,
+    CONF_FALLBACKS,
     CONF_SERVER_NAME,
-    CONF_SONIC_FALLBACK,
     CONF_TITLE_ARTIST_FALLBACK,
     CONF_URL,
     CONF_VERIFY_SSL,
@@ -37,20 +39,23 @@ from .constants import (
     DISCOVER_ITEM_LIMIT,
     DISCOVER_PER_SEED,
     DISCOVER_ROW_ID,
+    DEFAULT_FALLBACKS,
     DISCOVER_SEED_COUNT,
+    FALLBACK_NONE,
     PRIORITY_DEFAULT,
     PRIORITY_PREFERRED,
-    SONIC_DOMAIN,
     STATUS_REFRESH_SECONDS,
     TRISTATE_OFF,
     TRISTATE_ON,
     TRISTATE_SERVER_DEFAULT,
 )
 from .library import MassLibraryPort, track_to_seed
-from .similar import SimilarOptions, SimilarTracksService, with_fallback
+from .similar import SimilarOptions, SimilarTracksService, with_fallbacks
 from .status import format_status
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from music_assistant_models.config_entries import ProviderConfig
     from music_assistant_models.media_items import BrowseFolder, ItemMapping, MediaItemType, Track
     from music_assistant_models.provider import ProviderManifest
@@ -60,6 +65,12 @@ if TYPE_CHECKING:
     from .similar import SeedRef
 
 SUPPORTED_FEATURES = {ProviderFeature.SIMILAR_TRACKS, ProviderFeature.RECOMMENDATIONS}
+# the former on/off switch; only read to keep "no fallback" for installs that had turned it off
+LEGACY_CONF_SONIC_FALLBACK = "sonic_fallback"
+# set while this provider asks its fallbacks, so a fallback that loops back here returns nothing
+_IN_FALLBACK: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "audiomuse_in_fallback", default=False
+)
 
 
 class AudioMusePlugin(MetadataProvider):
@@ -106,6 +117,18 @@ class AudioMusePlugin(MetadataProvider):
             ConfigValueOption(TRISTATE_ON),
             ConfigValueOption(TRISTATE_OFF),
         ]
+        fallback_options = self._fallback_options()
+        fallback_entries = tuple(
+            ConfigEntry(
+                key=key,
+                type=ConfigEntryType.STRING,
+                options=fallback_options,
+                default_value=default,
+                required=False,
+                category="fallback",
+            )
+            for key, default in zip(CONF_FALLBACKS, DEFAULT_FALLBACKS, strict=True)
+        )
         return (
             ConfigEntry(
                 key=CONF_PREFER_OVER_BUILTIN,
@@ -113,12 +136,7 @@ class AudioMusePlugin(MetadataProvider):
                 default_value=True,
                 required=False,
             ),
-            ConfigEntry(
-                key=CONF_SONIC_FALLBACK,
-                type=ConfigEntryType.BOOLEAN,
-                default_value=True,
-                required=False,
-            ),
+            *fallback_entries,
             ConfigEntry(
                 key=CONF_ELIMINATE_DUPLICATES,
                 type=ConfigEntryType.STRING,
@@ -205,25 +223,26 @@ class AudioMusePlugin(MetadataProvider):
         :param track: The reference track (full library item, handed over by MA).
         :param limit: Maximum number of tracks.
         """
-        fallback = None
-        if bool(self.config.get_value(CONF_SONIC_FALLBACK)):
-
-            async def fallback() -> list[Track]:
-                return await self._sonic_similar_tracks(track, limit)
-
+        if _IN_FALLBACK.get():
+            return []
+        fallbacks = [
+            (instance_id, self._fallback_asker(instance_id, track, limit))
+            for instance_id in self._fallback_chain()
+        ]
         try:
-            tracks, source, primary_error = await with_fallback(
+            tracks, source, primary_error = await with_fallbacks(
                 lambda: self._service.similar_tracks(
                     track_to_seed(track), limit, self._similar_options()
                 ),
-                fallback,
+                fallbacks,
             )
         except AudioMuseError as err:
             raise ProviderUnavailableError(f"AudioMuse-AI: {err}") from err
-        if source == "fallback":
+        if source != "audiomuse":
             self.logger.debug(
-                "Similar tracks for %s served by Sonic Similarity (AudioMuse-AI: %s)",
+                "Similar tracks for %s served by %s (AudioMuse-AI: %s)",
                 track.name,
+                source,
                 primary_error or "no result",
             )
         return tracks
@@ -277,18 +296,74 @@ class AudioMusePlugin(MetadataProvider):
         except AudioMuseError as err:
             raise ProviderUnavailableError(f"AudioMuse-AI text search: {err}") from err
 
-    async def _sonic_similar_tracks(self, track: Track, limit: int) -> list[Track]:
-        """Ask the built-in Sonic Similarity plugin; empty when it is missing or fails."""
-        sonic = self.mass.get_provider(SONIC_DOMAIN)
+    def _fallback_chain(self) -> list[str]:
+        """Return the configured fallback provider instance ids, in order, without repeats."""
+        raw = self.mass.config.get_raw_provider_config_value
+        if raw(self.instance_id, CONF_FALLBACKS[0]) is None and (
+            raw(self.instance_id, LEGACY_CONF_SONIC_FALLBACK) is False
+        ):
+            return []
+        chain: list[str] = []
+        for key, default in zip(CONF_FALLBACKS, DEFAULT_FALLBACKS, strict=True):
+            value = str(self.config.get_value(key) or default)
+            if value != FALLBACK_NONE and value != self.instance_id and value not in chain:
+                chain.append(value)
+        return chain
+
+    def _fallback_options(self) -> list[ConfigValueOption]:
+        """Offer every loaded provider that can deliver similar tracks, plus the stored values."""
+        options = [ConfigValueOption(FALLBACK_NONE)]
+        seen = {FALLBACK_NONE, self.instance_id}
+        candidates = self.mass.get_providers_supporting_feature(
+            ProviderFeature.SIMILAR_TRACKS,
+            priority=(ProviderType.MUSIC, ProviderType.METADATA, ProviderType.PLUGIN),
+        )
+        for prov in candidates:
+            if prov.instance_id not in seen:
+                seen.add(prov.instance_id)
+                options.append(ConfigValueOption(prov.instance_id, title=prov.name))
+        # keep stored choices selectable even while their provider is not loaded (yet)
+        for key, default in zip(CONF_FALLBACKS, DEFAULT_FALLBACKS, strict=True):
+            value = str(self.config.get_value(key) or default)
+            if value not in seen:
+                seen.add(value)
+                options.append(ConfigValueOption(value, title=value))
+        return options
+
+    def _fallback_asker(
+        self, instance_id: str, track: Track, limit: int
+    ) -> Callable[[], Awaitable[list[Track]]]:
+        async def _ask() -> list[Track]:
+            token = _IN_FALLBACK.set(True)
+            try:
+                return await self._similar_from_provider(instance_id, track, limit)
+            finally:
+                _IN_FALLBACK.reset(token)
+
+        return _ask
+
+    async def _similar_from_provider(
+        self, instance_id: str, track: Track, limit: int
+    ) -> list[Track]:
+        """Ask another provider for similar tracks; empty when it is missing or fails."""
+        prov = self.mass.get_provider(instance_id)
         if (
-            sonic is None
-            or not sonic.available
-            or ProviderFeature.SIMILAR_TRACKS not in sonic.supported_features
-            or not hasattr(sonic, "get_similar_tracks")
+            prov is None
+            or not prov.available
+            or ProviderFeature.SIMILAR_TRACKS not in prov.supported_features
         ):
             return []
         try:
-            return list(await sonic.get_similar_tracks(track, limit=limit))
+            if isinstance(prov, MusicProvider):
+                # music providers want their own track id: only usable when the track has one
+                mapping = next(
+                    (m for m in track.provider_mappings if m.provider_instance == instance_id),
+                    None,
+                )
+                if mapping is None:
+                    return []
+                return list(await prov.get_similar_tracks(mapping.item_id, limit=limit))
+            return list(await prov.get_similar_tracks(track, limit=limit))
         except (
             MusicAssistantError,
             ClientError,
@@ -296,7 +371,7 @@ class AudioMusePlugin(MetadataProvider):
             TimeoutError,
             NotImplementedError,
         ) as err:
-            self.logger.debug("Sonic Similarity fallback failed for %s: %s", track.name, err)
+            self.logger.debug("Fallback %s failed for %s: %s", instance_id, track.name, err)
             return []
 
     def _discover_folder(self) -> RecommendationFolder:

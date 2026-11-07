@@ -17,8 +17,10 @@ CONF_ELIMINATE_DUPLICATES: Final = "eliminate_duplicates"
 CONF_MOOD_SIMILARITY: Final = "mood_similarity"
 CONF_TITLE_ARTIST_FALLBACK: Final = "title_artist_fallback"
 CONF_PREFER_OVER_BUILTIN: Final = "prefer_over_builtin"
-CONF_SONIC_FALLBACK: Final = "sonic_fallback"
-SONIC_DOMAIN: Final = "sonic_similarity"
+# ranked fallback sources for similar tracks (provider instance ids, or FALLBACK_NONE)
+CONF_FALLBACKS: Final = ("fallback_1", "fallback_2", "fallback_3")
+FALLBACK_NONE: Final = "none"
+DEFAULT_FALLBACKS: Final = ("sonic_similarity", FALLBACK_NONE, FALLBACK_NONE)
 
 # discover page row and status
 CONF_ENABLE_DISCOVER_ROW: Final = "enable_discover_row"
