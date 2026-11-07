@@ -188,3 +188,21 @@ def test_dashboard_summary_and_active_task(run) -> None:
             assert (await client.active_task())["task_id"] == "t1"
 
     run(scenario())
+
+
+def test_moods_anchors_and_radius(run) -> None:
+    async def scenario() -> None:
+        state = FakeState()
+        async with serve(build_audiomuse_app(state)) as (url, session):
+            client = AudioMuseClient(session, url, api_token=TOKEN)
+            await client.similar_tracks(item_id="11", n=3, radius_similarity=True)
+            assert state.requests[-1][1]["radius_similarity"] == "true"
+            await client.mood_tracks("happy", 1, n=7)
+            assert state.requests[-1][1] == {"mood": "happy", "centroid_index": "1", "n": "7"}
+            await client.anchor_tracks(3, n=9)
+            assert state.requests[-1][1] == {"anchor_id": "3", "n": "9"}
+            assert await client.anchors() == [(3, "Rainy jazz")]
+            moods = await client.mood_centroids()
+            assert [c["index"] for c in moods["happy"]] == [0, 1]
+
+    run(scenario())

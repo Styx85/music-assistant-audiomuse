@@ -15,6 +15,7 @@ CONF_SERVER_NAME: Final = "server_name"
 # similar tracks behaviour
 CONF_ELIMINATE_DUPLICATES: Final = "eliminate_duplicates"
 CONF_MOOD_SIMILARITY: Final = "mood_similarity"
+CONF_RADIUS_SIMILARITY: Final = "radius_similarity"
 CONF_TITLE_ARTIST_FALLBACK: Final = "title_artist_fallback"
 CONF_PREFER_OVER_BUILTIN: Final = "prefer_over_builtin"
 # ranked fallback sources for similar tracks (provider instance ids, or FALLBACK_NONE)
@@ -30,6 +31,15 @@ DISCOVER_SEED_COUNT: Final = 5
 DISCOVER_PER_SEED: Final = 10
 DISCOVER_ITEM_LIMIT: Final = 12
 DISCOVER_CACHE_SECONDS: Final = 300
+
+# mood and alchemy rows on the discover page
+CONF_ENABLE_MOOD_ROWS: Final = "enable_mood_rows"
+CONF_ENABLE_ALCHEMY_ROWS: Final = "enable_alchemy_rows"
+MOODS: Final = ("happy", "relaxed", "danceable", "party", "aggressive", "sad")
+MOOD_ROW_PREFIX: Final = "audiomuse_mood_"
+ANCHOR_ROW_PREFIX: Final = "audiomuse_anchor_"
+ROW_ITEM_LIMIT: Final = 25
+ROW_CACHE_SECONDS: Final = 600
 STATUS_REFRESH_SECONDS: Final = 300
 
 # tri-state choices for options AudioMuse-AI can decide itself

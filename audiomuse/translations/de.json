@@ -62,6 +62,15 @@
         "off": "Aus"
       }
     },
+    "radius_similarity": {
+      "label": "Fließendes Radio (weniger Sprünge)",
+      "description": "Ähnliche Titel als fließenden Weg vom Startpunkt ordnen, sodass das Radio allmählich wandert statt zu springen (AudioMuse-AI-Radiussuche).",
+      "options": {
+        "server_default": "Standard von AudioMuse-AI",
+        "on": "An",
+        "off": "Aus"
+      }
+    },
     "title_artist_fallback": {
       "label": "Unbekannte Titel über Künstler und Titel suchen",
       "description": "Kennt AudioMuse-AI den Titel nicht (noch nicht analysiert oder ein Streaming-Titel), wird stattdessen nach Künstler und Titel gefragt."
@@ -69,6 +78,14 @@
     "enable_discover_row": {
       "label": "„Inspiriert von kürzlich gespielten Titeln“ auf der Entdecken-Seite anzeigen",
       "description": "Eine Zeile mit Titeln, die AudioMuse-AI ähnlich zu deinen zuletzt gespielten Titeln findet."
+    },
+    "enable_mood_rows": {
+      "label": "Stimmungs-Zeilen auf der Entdecken-Seite anzeigen",
+      "description": "Zeilen für Fröhlich, Entspannt, Tanzbar, Party, Energiegeladen und Melancholisch aus den Stimmungs-Ankern von AudioMuse-AI. Sie sind anfangs ausgeblendet; blende auf der Entdecken-Seite ein, was dir gefällt."
+    },
+    "enable_alchemy_rows": {
+      "label": "Alchemy-Zeilen auf der Entdecken-Seite anzeigen",
+      "description": "Eine Zeile je in AudioMuse-AI gespeichertem Alchemy-Anker (gebaut auf der Alchemy-Seite von AudioMuse-AI)."
     }
   },
   "config_categories": {
@@ -78,5 +95,30 @@
   },
   "manifest": {
     "description": "Ähnliche Titel und Radio-Modus von einem selbst betriebenen AudioMuse-AI-Klanganalyse-Server."
+  },
+  "media": {
+    "recommendations": {
+      "mood_happy": {
+        "name": "Fröhlich"
+      },
+      "mood_relaxed": {
+        "name": "Entspannt"
+      },
+      "mood_danceable": {
+        "name": "Tanzbar"
+      },
+      "mood_party": {
+        "name": "Party"
+      },
+      "mood_aggressive": {
+        "name": "Energiegeladen"
+      },
+      "mood_sad": {
+        "name": "Melancholisch"
+      },
+      "alchemy_anchor": {
+        "name": "Alchemy: {0}"
+      }
+    }
   }
 }

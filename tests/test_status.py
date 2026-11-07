@@ -36,3 +36,18 @@ def test_status_pending_and_error() -> None:
     assert format_status(None, None, None) == "AudioMuse-AI: status pending"
     assert format_status("v1", None, None, "timeout") == "AudioMuse-AI not reachable: timeout"
     assert "0 songs" in format_status("v1", {"content": {"total_songs": "x"}}, None)
+
+
+def test_pick_mood_centroids() -> None:
+    from audiomuse.status import pick_mood_centroids
+
+    centroids = {
+        "happy": [
+            {"index": 0, "mood_score": 0.4, "n_songs": 900},
+            {"index": 7, "mood_score": 0.9, "n_songs": 10},
+            {"index": 3, "mood_score": 0.9, "n_songs": 50},
+        ],
+        "sad": [{"index": "x"}],
+        "relaxed": [],
+    }
+    assert pick_mood_centroids(centroids) == {"happy": 3}

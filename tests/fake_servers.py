@@ -75,6 +75,16 @@ def build_audiomuse_app(state: FakeState) -> web.Application:
         rows = SIMILAR_ROWS[: int(body.get("limit", 2))]
         return web.json_response({"query": body["query"], "results": rows, "count": len(rows)})
 
+    async def anchors(request: web.Request) -> web.Response:
+        await record(request)
+        return web.json_response({"anchors": [{"id": 3, "name": "Rainy jazz"}, {"name": "x"}]})
+
+    async def moods(request: web.Request) -> web.Response:
+        await record(request)
+        return web.json_response(
+            {"happy": [{"index": 0, "mood_score": 0.4}, {"index": 1, "mood_score": 0.9}]}
+        )
+
     async def summary(request: web.Request) -> web.Response:
         await record(request)
         return web.json_response({"content": {"total_songs": 44, "clap_indexed": 40}})
@@ -96,6 +106,8 @@ def build_audiomuse_app(state: FakeState) -> web.Application:
     app.router.add_get("/api/not_json", not_json)
     app.router.add_get("/api/dashboard/summary", summary)
     app.router.add_get("/api/active_tasks", active)
+    app.router.add_get("/api/anchors", anchors)
+    app.router.add_get("/api/mood_centroids", moods)
     return app
 
 

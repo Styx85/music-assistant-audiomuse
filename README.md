@@ -2,8 +2,9 @@
 
 [Music Assistant](https://music-assistant.io) providers that bring a self-hosted
 [AudioMuse-AI](https://github.com/NeptuneHub/AudioMuse-AI) sonic analysis server into Music
-Assistant: similar tracks for **radio mode** and **autoplay**, a **discover row**, and
-**free-text search** by sound ("calm piano in the evening").
+Assistant: similar tracks for **radio mode** and **autoplay**, **discover rows** (inspired by
+recently played, moods, alchemy), **free-text search** by sound ("calm piano in the evening")
+and **song paths** between two tracks.
 
 ## Status
 
@@ -14,9 +15,13 @@ Assistant: similar tracks for **radio mode** and **autoplay**, a **discover row*
 | Similar tracks / radio / autoplay | working against a real Music Assistant; results from AudioMuse-AI once its first analysis has built the index |
 | Ranked fallback (e.g. Sonic Similarity, Last.fm, Spotify) | working |
 | Discover row "Inspired by recently played" | working |
+| Mood rows (happy, relaxed, danceable, party, energetic, melancholic) | working, hidden by default |
+| Alchemy rows (one per anchor saved in AudioMuse-AI) | working |
+| Smooth radio (AudioMuse-AI radius similarity) | option |
+| Song path | API commands `audiomuse/song_path`, `audiomuse/song_path_playlist` |
 | Free-text search (`audiomuse_search`) | working |
 | Status line, English and German UI | working |
-| More similarity options, song path, alchemy | planned |
+| Song path / alchemy buttons inside Music Assistant's UI | not possible without UI changes in Music Assistant; use the API commands or AudioMuse-AI's own UI (its playlists land in Music Assistant) |
 
 Needs AudioMuse-AI with the **Music Assistant server type**, which is not upstream yet:
 [Styx85/AudioMuse-AI, branch `music-assistant-server`](https://github.com/Styx85/AudioMuse-AI/tree/music-assistant-server)
@@ -110,9 +115,25 @@ Check the Python version in the path (`docker exec music-assistant ls /app/venv/
 | --- | --- | --- |
 | Ask AudioMuse-AI first | on | priority 10 (before Last.fm), otherwise 60 |
 | Fallback 1 / 2 / 3 | Sonic Similarity / none / none | ranked sources when AudioMuse-AI has no answer |
+| Smooth radio (fewer jumps) | AudioMuse-AI default | radius similarity: the radio drifts gradually |
 | Show "Inspired by recently played" | on | discover row from your last 5 played tracks |
+| Show mood rows / alchemy rows | on | rows on the discover page (mood rows start hidden there) |
 | Limit songs per artist, Also match mood | AudioMuse-AI default | passed to AudioMuse-AI |
 | Look up unmatched tracks by artist and title | on | for tracks AudioMuse-AI does not know |
+
+## Song path
+
+Music Assistant has no UI to pick two tracks, so song paths are API commands (e.g. for scripts
+or automations), taking Music Assistant library ids:
+
+```json
+{"command": "audiomuse/song_path_playlist",
+ "args": {"start_item_id": "51977", "end_item_id": "5", "max_steps": 15}}
+```
+
+`audiomuse/song_path` returns the tracks; `audiomuse/song_path_playlist` also saves them as a
+playlist ("Song path: A → B" unless `name` is given). Paths and alchemy playlists built in
+AudioMuse-AI's own web UI are created as Music Assistant playlists as well.
 
 ## Development
 

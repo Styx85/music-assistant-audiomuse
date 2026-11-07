@@ -47,6 +47,7 @@ class SimilarOptions:
 
     eliminate_duplicates: bool | None = None
     mood_similarity: bool | None = None
+    radius_similarity: bool | None = None
     title_artist_fallback: bool = True
 
 
@@ -113,6 +114,7 @@ class SimilarTracksService(Generic[T]):
                     n=n,
                     eliminate_duplicates=opts.eliminate_duplicates,
                     mood_similarity=opts.mood_similarity,
+                    radius_similarity=opts.radius_similarity,
                 )
                 stats.seed_by_id = True
             except AudioMuseNotFoundError:
@@ -126,6 +128,7 @@ class SimilarTracksService(Generic[T]):
                     n=n,
                     eliminate_duplicates=opts.eliminate_duplicates,
                     mood_similarity=opts.mood_similarity,
+                    radius_similarity=opts.radius_similarity,
                 )
             except AudioMuseNotFoundError:
                 self._logger.debug("AudioMuse-AI does not know %s", seed.title)
@@ -193,6 +196,7 @@ class SimilarTracksService(Generic[T]):
                         n=min(MAX_REQUEST_N, per_seed + 1),
                         eliminate_duplicates=opts.eliminate_duplicates,
                         mood_similarity=opts.mood_similarity,
+                        radius_similarity=opts.radius_similarity,
                     )
             except (AudioMuseNotFoundError, TimeoutError):
                 return []
@@ -234,6 +238,30 @@ class SimilarTracksService(Generic[T]):
         ids = list(dict.fromkeys(row.item_id for row in rows))
         tracks = [t for t in await self._load_all(ids) if t is not None]
         return tracks[:limit]
+
+    async def load_rows(self, rows: list[SimilarTrack], limit: int | None = None) -> list[T]:
+        """
+        Load AudioMuse-AI result rows as library tracks, keeping their order.
+
+        Duplicates and ids that are not (or no longer) in the library are dropped.
+
+        :param rows: Result rows (e.g. a mood row, an anchor row or a song path).
+        :param limit: Maximum number of tracks; None keeps all.
+        """
+        ids = list(dict.fromkeys(row.item_id for row in rows))
+        tracks = [t for t in await self._load_all(ids) if t is not None]
+        return tracks if limit is None else tracks[:limit]
+
+    async def song_path(self, start_id: str, end_id: str, max_steps: int | None = None) -> list[T]:
+        """
+        Return a smooth sequence of library tracks from one track to another (both included).
+
+        :param start_id: Library id of the first track.
+        :param end_id: Library id of the last track.
+        :param max_steps: Maximum number of intermediate songs; None uses AudioMuse-AI's default.
+        """
+        rows = await self._client.find_path(start_id, end_id, max_steps=max_steps)
+        return await self.load_rows(rows)
 
     async def _load_all(self, ids: list[str]) -> list[T | None]:
         semaphore = asyncio.Semaphore(RESOLVE_CONCURRENCY)

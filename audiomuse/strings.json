@@ -58,6 +58,15 @@
       },
       "description": "Also filter results by mood features (danceable, happy, relaxed, sad, ...)."
     },
+    "radius_similarity": {
+      "label": "Smooth radio (fewer jumps)",
+      "description": "Order similar tracks as a smooth walk from the seed, so the radio drifts gradually instead of jumping (AudioMuse-AI radius similarity).",
+      "options": {
+        "server_default": "AudioMuse-AI default",
+        "on": "On",
+        "off": "Off"
+      }
+    },
     "title_artist_fallback": {
       "label": "Look up unmatched tracks by artist and title",
       "description": "If AudioMuse-AI does not know the track (not analyzed yet, or a streaming track), ask it by artist and title instead."
@@ -69,6 +78,14 @@
     "enable_discover_row": {
       "label": "Show 'Inspired by recently played' on the discover page",
       "description": "A discover row with tracks AudioMuse-AI finds similar to your recently played tracks."
+    },
+    "enable_mood_rows": {
+      "label": "Show mood rows on the discover page",
+      "description": "Rows for Happy, Relaxed, Danceable, Party, Energetic and Melancholic from AudioMuse-AI's mood anchors. They start hidden; enable the ones you like on the discover page."
+    },
+    "enable_alchemy_rows": {
+      "label": "Show alchemy rows on the discover page",
+      "description": "One row per alchemy anchor saved in AudioMuse-AI (build them in AudioMuse-AI's Alchemy page)."
     }
   },
   "manifest": {
@@ -78,5 +95,30 @@
     "discover": "Discover",
     "status": "Status",
     "fallback": "Fallback when AudioMuse-AI has no answer"
+  },
+  "media": {
+    "recommendations": {
+      "mood_happy": {
+        "name": "Happy"
+      },
+      "mood_relaxed": {
+        "name": "Relaxed"
+      },
+      "mood_danceable": {
+        "name": "Danceable"
+      },
+      "mood_party": {
+        "name": "Party"
+      },
+      "mood_aggressive": {
+        "name": "Energetic"
+      },
+      "mood_sad": {
+        "name": "Melancholic"
+      },
+      "alchemy_anchor": {
+        "name": "Alchemy: {0}"
+      }
+    }
   }
 }

@@ -41,6 +41,31 @@ def format_status(
     return " · ".join(parts)
 
 
+def pick_mood_centroids(centroids: dict[str, list[dict[str, Any]]]) -> dict[str, int]:
+    """
+    Choose one centroid per mood: the one AudioMuse-AI rates as most typical for it.
+
+    :param centroids: Result of ``/api/mood_centroids`` (mood -> list of centroid metadata).
+    """
+    chosen: dict[str, int] = {}
+    for mood, items in centroids.items():
+        best = max(
+            (c for c in items if isinstance(c.get("index"), int)),
+            key=lambda c: (_float(c.get("mood_score")), _int(c.get("n_songs"))),
+            default=None,
+        )
+        if best is not None:
+            chosen[mood] = int(best["index"])
+    return chosen
+
+
+def _float(value: Any) -> float:
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _int(value: Any) -> int:
     try:
         return int(value or 0)

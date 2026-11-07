@@ -60,7 +60,13 @@ def test_by_library_id_drops_seed_duplicates_and_missing(run) -> None:
 
     assert [t.item_id for t in result] == ["2", "3"]  # seed, duplicate and 404 skipped
     assert client.calls == [
-        {"item_id": "1", "n": 5, "eliminate_duplicates": True, "mood_similarity": False}
+        {
+            "item_id": "1",
+            "n": 5,
+            "eliminate_duplicates": True,
+            "mood_similarity": False,
+            "radius_similarity": None,
+        }
     ]
     assert "1" not in library.asked  # the seed is never loaded
     assert library.asked.count("2") == 1
@@ -247,3 +253,28 @@ def test_with_fallbacks_keeps_error_when_nothing_answers(run) -> None:
     with pytest.raises(AudioMuseUnavailableError):
         run(with_fallbacks(failing, []))
     assert run(with_fallbacks(empty, [])) == ([], "none", None)
+
+
+
+class PathClient:
+    def __init__(self, rows):
+        self.rows = rows
+        self.calls: list[tuple] = []
+
+    async def find_path(self, start, end, max_steps=None):
+        self.calls.append((start, end, max_steps))
+        return self.rows
+
+
+def test_song_path_keeps_order_and_drops_missing(run) -> None:
+    client = PathClient([_row("1"), _row("5"), _row("404"), _row("5"), _row("9")])
+    service = SimilarTracksService(client, FakeLibrary({"1", "5", "9"}))
+    assert [t.item_id for t in run(service.song_path("1", "9", max_steps=8))] == ["1", "5", "9"]
+    assert client.calls == [("1", "9", 8)]
+
+
+def test_load_rows_limit(run) -> None:
+    service = SimilarTracksService(FakeClient(), FakeLibrary({"1", "2", "3"}))
+    rows = [_row("3"), _row("x"), _row("1"), _row("2")]
+    assert [t.item_id for t in run(service.load_rows(rows, limit=2))] == ["3", "1"]
+    assert len(run(service.load_rows(rows))) == 3

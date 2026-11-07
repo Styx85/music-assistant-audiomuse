@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
+import re
 import time
 from typing import TYPE_CHECKING
 
 from aiohttp import ClientError
 
+from music_assistant_models.auth import Scope
 from music_assistant_models.config_entries import ConfigEntry, ConfigValueOption
 from music_assistant_models.enums import ConfigEntryType, MediaType, ProviderFeature, ProviderType
 from music_assistant_models.errors import (
@@ -17,7 +19,7 @@ from music_assistant_models.errors import (
     ProviderUnavailableError,
     SetupFailedError,
 )
-from music_assistant_models.media_items import RecommendationFolder, UniqueList
+from music_assistant_models.media_items import Playlist, RecommendationFolder, UniqueList
 
 from music_assistant.models.metadata_provider import MetadataProvider
 from music_assistant.models.music_provider import MusicProvider
@@ -26,10 +28,13 @@ from .client import AudioMuseAuthError, AudioMuseClient, AudioMuseError
 from .constants import (
     CONF_API_TOKEN,
     CONF_ELIMINATE_DUPLICATES,
+    CONF_ENABLE_ALCHEMY_ROWS,
     CONF_ENABLE_DISCOVER_ROW,
+    CONF_ENABLE_MOOD_ROWS,
     CONF_LABEL_STATUS,
     CONF_MOOD_SIMILARITY,
     CONF_PREFER_OVER_BUILTIN,
+    CONF_RADIUS_SIMILARITY,
     CONF_FALLBACKS,
     CONF_SERVER_NAME,
     CONF_TITLE_ARTIST_FALLBACK,
@@ -39,11 +44,16 @@ from .constants import (
     DISCOVER_ITEM_LIMIT,
     DISCOVER_PER_SEED,
     DISCOVER_ROW_ID,
+    ANCHOR_ROW_PREFIX,
     DEFAULT_FALLBACKS,
     DISCOVER_SEED_COUNT,
     FALLBACK_NONE,
+    MOOD_ROW_PREFIX,
+    MOODS,
     PRIORITY_DEFAULT,
     PRIORITY_PREFERRED,
+    ROW_CACHE_SECONDS,
+    ROW_ITEM_LIMIT,
     STATUS_REFRESH_SECONDS,
     TRISTATE_OFF,
     TRISTATE_ON,
@@ -51,7 +61,7 @@ from .constants import (
 )
 from .library import MassLibraryPort, track_to_seed
 from .similar import SimilarOptions, SimilarTracksService, with_fallbacks
-from .status import format_status
+from .status import format_status, pick_mood_centroids
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -98,6 +108,10 @@ class AudioMusePlugin(MetadataProvider):
         self._status_task: asyncio.Task[None] | None = None
         # keyed by the seed ids: recently played is per user, so users never share entries
         self._discover_cache: dict[tuple[str, ...], tuple[float, list[Track]]] = {}
+        self._row_cache: dict[str, tuple[float, list[Track]]] = {}
+        self._anchors: list[tuple[int, str]] = []
+        self._mood_centroid: dict[str, int] = {}
+        self._unregister_commands: list[Callable[[], None]] = []
 
     @property
     def priority(self) -> int:
@@ -154,6 +168,13 @@ class AudioMusePlugin(MetadataProvider):
                 advanced=True,
             ),
             ConfigEntry(
+                key=CONF_RADIUS_SIMILARITY,
+                type=ConfigEntryType.STRING,
+                options=tristate,
+                default_value=TRISTATE_SERVER_DEFAULT,
+                required=False,
+            ),
+            ConfigEntry(
                 key=CONF_TITLE_ARTIST_FALLBACK,
                 type=ConfigEntryType.BOOLEAN,
                 default_value=True,
@@ -162,6 +183,20 @@ class AudioMusePlugin(MetadataProvider):
             ),
             ConfigEntry(
                 key=CONF_ENABLE_DISCOVER_ROW,
+                type=ConfigEntryType.BOOLEAN,
+                default_value=True,
+                required=False,
+                category="discover",
+            ),
+            ConfigEntry(
+                key=CONF_ENABLE_MOOD_ROWS,
+                type=ConfigEntryType.BOOLEAN,
+                default_value=True,
+                required=False,
+                category="discover",
+            ),
+            ConfigEntry(
+                key=CONF_ENABLE_ALCHEMY_ROWS,
                 type=ConfigEntryType.BOOLEAN,
                 default_value=True,
                 required=False,
@@ -206,15 +241,72 @@ class AudioMusePlugin(MetadataProvider):
         )
 
     async def loaded_in_mass(self) -> None:
-        """Start the background status refresh."""
+        """Start the background status refresh and register the song path API commands."""
         await super().loaded_in_mass()
         self._status_task = self.mass.create_task(self._status_loop())
+        self._unregister_commands = [
+            self.mass.register_api_command(
+                "audiomuse/song_path", self.song_path, required_scope=Scope.LIBRARY_READ
+            ),
+            self.mass.register_api_command(
+                "audiomuse/song_path_playlist",
+                self.song_path_playlist,
+                required_scope=Scope.LIBRARY_WRITE,
+            ),
+        ]
 
     async def unload(self, is_removed: bool = False) -> None:
-        """Stop the background status refresh."""
+        """Stop the background status refresh and remove the API commands."""
         if self._status_task and not self._status_task.done():
             self._status_task.cancel()
+        for unregister in self._unregister_commands:
+            unregister()
+        self._unregister_commands.clear()
         await super().unload(is_removed)
+
+    async def song_path(
+        self, start_item_id: str, end_item_id: str, max_steps: int | None = None
+    ) -> list[Track]:
+        """
+        Return a smooth sequence of library tracks from one track to another (API command).
+
+        :param start_item_id: Library id of the first track.
+        :param end_item_id: Library id of the last track.
+        :param max_steps: Maximum number of intermediate songs; empty uses AudioMuse-AI's default.
+        """
+        try:
+            return await self._service.song_path(
+                str(start_item_id), str(end_item_id), max_steps=max_steps
+            )
+        except AudioMuseError as err:
+            raise ProviderUnavailableError(f"AudioMuse-AI song path: {err}") from err
+
+    async def song_path_playlist(
+        self,
+        start_item_id: str,
+        end_item_id: str,
+        name: str | None = None,
+        max_steps: int | None = None,
+    ) -> Playlist:
+        """
+        Build a song path and save it as a Music Assistant playlist (API command).
+
+        :param start_item_id: Library id of the first track.
+        :param end_item_id: Library id of the last track.
+        :param name: Playlist name; defaults to "Song path: <first> → <last>".
+        :param max_steps: Maximum number of intermediate songs.
+        """
+        tracks = await self.song_path(start_item_id, end_item_id, max_steps)
+        if not tracks:
+            raise ProviderUnavailableError("AudioMuse-AI found no path between these tracks")
+        playlist = await self.mass.music.playlists.create_playlist(
+            name or _safe_name(f"Song path: {tracks[0].name} → {tracks[-1].name}")
+        )
+        # add one by one and wait: add_playlist_tracks only queues a background task, so the
+        # caller would get the playlist before it is filled and never hear about failures
+        for track in tracks:
+            await self.mass.music.playlists.add_playlist_track(playlist.item_id, str(track.uri))
+        return playlist
 
     async def get_similar_tracks(self, track: Track, limit: int = 25) -> list[Track]:
         """
@@ -248,10 +340,15 @@ class AudioMusePlugin(MetadataProvider):
         return tracks
 
     async def get_recommendations(self) -> list[RecommendationFolder]:
-        """Return the discover row descriptor (no items, no backend call)."""
-        if not bool(self.config.get_value(CONF_ENABLE_DISCOVER_ROW)):
-            return []
-        return [self._discover_folder()]
+        """Return the row descriptors (no items, no backend call: from cached state only)."""
+        rows: list[RecommendationFolder] = []
+        if bool(self.config.get_value(CONF_ENABLE_DISCOVER_ROW)):
+            rows.append(self._discover_folder())
+        if bool(self.config.get_value(CONF_ENABLE_ALCHEMY_ROWS)):
+            rows.extend(self._anchor_folder(anchor_id, name) for anchor_id, name in self._anchors)
+        if bool(self.config.get_value(CONF_ENABLE_MOOD_ROWS)):
+            rows.extend(self._mood_folder(mood) for mood in MOODS if mood in self._mood_centroid)
+        return rows
 
     async def get_recommendation_items(
         self, item_id: str
@@ -261,6 +358,8 @@ class AudioMusePlugin(MetadataProvider):
 
         :param item_id: The row id, as returned by get_recommendations.
         """
+        if item_id.startswith((MOOD_ROW_PREFIX, ANCHOR_ROW_PREFIX)):
+            return UniqueList(await self._row_items(item_id))
         if item_id != DISCOVER_ROW_ID or not bool(self.config.get_value(CONF_ENABLE_DISCOVER_ROW)):
             return UniqueList()
         seeds = await self._recent_seeds()
@@ -374,6 +473,56 @@ class AudioMusePlugin(MetadataProvider):
             self.logger.debug("Fallback %s failed for %s: %s", instance_id, track.name, err)
             return []
 
+    async def _row_items(self, item_id: str) -> list[Track]:
+        now = time.monotonic()
+        cached = self._row_cache.get(item_id)
+        if cached and now - cached[0] < ROW_CACHE_SECONDS:
+            return cached[1]
+        try:
+            if item_id.startswith(MOOD_ROW_PREFIX):
+                mood = item_id.removeprefix(MOOD_ROW_PREFIX)
+                if not bool(self.config.get_value(CONF_ENABLE_MOOD_ROWS)) or (
+                    mood not in self._mood_centroid
+                ):
+                    return []
+                rows = await self._client.mood_tracks(
+                    mood, self._mood_centroid[mood], n=ROW_ITEM_LIMIT * 2
+                )
+            else:
+                anchor = item_id.removeprefix(ANCHOR_ROW_PREFIX)
+                enabled = bool(self.config.get_value(CONF_ENABLE_ALCHEMY_ROWS))
+                if not enabled or not anchor.isdigit():
+                    return []
+                rows = await self._client.anchor_tracks(int(anchor), n=ROW_ITEM_LIMIT * 2)
+        except AudioMuseError as err:
+            self.logger.debug("Row %s unavailable: %s", item_id, err)
+            return []
+        tracks = await self._service.load_rows(rows, limit=ROW_ITEM_LIMIT)
+        self._row_cache[item_id] = (now, tracks)
+        return tracks
+
+    def _mood_folder(self, mood: str) -> RecommendationFolder:
+        return RecommendationFolder(
+            item_id=f"{MOOD_ROW_PREFIX}{mood}",
+            provider=self.instance_id,
+            name=mood.capitalize(),
+            translation_key=f"mood_{mood}",
+            subtitle="AudioMuse-AI",
+            icon="mdi-emoticon-outline",
+            enabled_by_default=False,
+        )
+
+    def _anchor_folder(self, anchor_id: int, name: str) -> RecommendationFolder:
+        return RecommendationFolder(
+            item_id=f"{ANCHOR_ROW_PREFIX}{anchor_id}",
+            provider=self.instance_id,
+            name=f"Alchemy: {name}",
+            translation_key="alchemy_anchor",
+            translation_params=[name],
+            subtitle="AudioMuse-AI",
+            icon="mdi-flask-outline",
+        )
+
     def _discover_folder(self) -> RecommendationFolder:
         return RecommendationFolder(
             item_id=DISCOVER_ROW_ID,
@@ -416,13 +565,27 @@ class AudioMusePlugin(MetadataProvider):
             self._status_text = format_status(self._version, None, None, str(err))
             return
         self._status_text = format_status(self._version, summary, active)
+        try:
+            self._anchors = await self._client.anchors()
+            self._mood_centroid = pick_mood_centroids(await self._client.mood_centroids())
+        except AudioMuseError as err:
+            self.logger.debug("Could not refresh alchemy anchors / mood centroids: %s", err)
 
     def _similar_options(self) -> SimilarOptions:
         return SimilarOptions(
             eliminate_duplicates=_tristate(self.config.get_value(CONF_ELIMINATE_DUPLICATES)),
             mood_similarity=_tristate(self.config.get_value(CONF_MOOD_SIMILARITY)),
+            radius_similarity=_tristate(self.config.get_value(CONF_RADIUS_SIMILARITY)),
             title_artist_fallback=bool(self.config.get_value(CONF_TITLE_ARTIST_FALLBACK)),
         )
+
+
+def _safe_name(name: str) -> str:
+    """Return a playlist name without path separators or parent-directory sequences."""
+    cleaned = re.sub(r"[\\/]+", "-", name)
+    while ".." in cleaned:
+        cleaned = cleaned.replace("..", ".")
+    return cleaned.strip() or "Song path"
 
 
 def _tristate(value: object) -> bool | None:

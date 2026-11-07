@@ -139,6 +139,7 @@ class AudioMuseClient:
         n: int = 25,
         eliminate_duplicates: bool | None = None,
         mood_similarity: bool | None = None,
+        radius_similarity: bool | None = None,
     ) -> list[SimilarTrack]:
         """
         Return tracks that sound similar to a seed track.
@@ -149,6 +150,8 @@ class AudioMuseClient:
         :param n: Number of neighbours to request.
         :param eliminate_duplicates: Limit songs per artist; None keeps the server default.
         :param mood_similarity: Also filter by mood features; None keeps the server default.
+        :param radius_similarity: Order results as a smooth walk (fewer jumps); None keeps the
+            server default.
         :raises AudioMuseNotFoundError: The seed is not analyzed or has no neighbours.
         """
         params: dict[str, str] = {"n": str(max(1, n))}
@@ -163,8 +166,54 @@ class AudioMuseClient:
             params["eliminate_duplicates"] = _bool_param(eliminate_duplicates)
         if mood_similarity is not None:
             params["mood_similarity"] = _bool_param(mood_similarity)
+        if radius_similarity is not None:
+            params["radius_similarity"] = _bool_param(radius_similarity)
         data = await self._request("GET", "/api/similar_tracks", params=params)
         return _parse_rows(data)
+
+    async def mood_tracks(self, mood: str, centroid_index: int, n: int = 25) -> list[SimilarTrack]:
+        """
+        Return tracks closest to one of AudioMuse-AI's mood centroids.
+
+        :param mood: Mood name, e.g. ``happy`` or ``relaxed``.
+        :param centroid_index: Index of the centroid within that mood.
+        :param n: Number of tracks.
+        """
+        params = {"mood": mood, "centroid_index": str(centroid_index), "n": str(max(1, n))}
+        return _parse_rows(await self._request("GET", "/api/similar_tracks", params=params))
+
+    async def anchor_tracks(self, anchor_id: int, n: int = 25) -> list[SimilarTrack]:
+        """
+        Return tracks closest to a saved alchemy anchor.
+
+        :param anchor_id: Id of the anchor (see :meth:`anchors`).
+        :param n: Number of tracks.
+        """
+        params = {"anchor_id": str(anchor_id), "n": str(max(1, n))}
+        return _parse_rows(await self._request("GET", "/api/similar_tracks", params=params))
+
+    async def anchors(self) -> list[tuple[int, str]]:
+        """Return the saved alchemy anchors as ``(id, name)``."""
+        data = await self._request("GET", "/api/anchors")
+        rows = data.get("anchors") if isinstance(data, dict) else None
+        if not isinstance(rows, list):
+            raise AudioMuseError("unexpected response from /api/anchors")
+        return [
+            (int(row["id"]), str(row.get("name") or row["id"]))
+            for row in rows
+            if isinstance(row, dict) and isinstance(row.get("id"), int)
+        ]
+
+    async def mood_centroids(self) -> dict[str, list[dict[str, Any]]]:
+        """Return the mood centroid metadata (index, top tags, mood score) per mood."""
+        data = await self._request("GET", "/api/mood_centroids")
+        if not isinstance(data, dict):
+            raise AudioMuseError("unexpected response from /api/mood_centroids")
+        return {
+            str(mood): [c for c in centroids if isinstance(c, dict)]
+            for mood, centroids in data.items()
+            if isinstance(centroids, list)
+        }
 
     async def find_path(
         self, start_item_id: str, end_item_id: str, max_steps: int | None = None
