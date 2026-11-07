@@ -318,6 +318,11 @@ class AudioMusePlugin(MetadataProvider):
         # caller would get the playlist before it is filled and never hear about failures
         for track in tracks:
             await self.mass.music.playlists.add_playlist_track(playlist.item_id, str(track.uri))
+        # single-track adds do not refresh Music Assistant's cached track listing
+        async for _ in self.mass.music.playlists.tracks(
+            str(playlist.item_id), "library", force_refresh=True
+        ):
+            pass
         return playlist
 
     async def get_similar_tracks(self, track: Track, limit: int = 25) -> list[Track]:
