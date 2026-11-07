@@ -14,6 +14,7 @@ from music_assistant_models.auth import Scope
 from music_assistant_models.config_entries import ConfigEntry, ConfigValueOption
 from music_assistant_models.enums import ConfigEntryType, MediaType, ProviderFeature, ProviderType
 from music_assistant_models.errors import (
+    InvalidDataError,
     LoginFailed,
     MusicAssistantError,
     ProviderUnavailableError,
@@ -24,7 +25,7 @@ from music_assistant_models.media_items import Playlist, RecommendationFolder, U
 from music_assistant.models.metadata_provider import MetadataProvider
 from music_assistant.models.music_provider import MusicProvider
 
-from .client import AudioMuseAuthError, AudioMuseClient, AudioMuseError
+from .client import AudioMuseAuthError, AudioMuseClient, AudioMuseError, AudioMuseNotFoundError
 from .constants import (
     CONF_API_TOKEN,
     CONF_ELIMINATE_DUPLICATES,
@@ -278,6 +279,12 @@ class AudioMusePlugin(MetadataProvider):
             return await self._service.song_path(
                 str(start_item_id), str(end_item_id), max_steps=max_steps
             )
+        except AudioMuseNotFoundError as err:
+            # Music Assistant answers InvalidDataError with HTTP 400 and the message
+            raise InvalidDataError(
+                "AudioMuse-AI found no path between these tracks (are both analyzed? "
+                f"try more steps): {err}"
+            ) from err
         except AudioMuseError as err:
             raise ProviderUnavailableError(f"AudioMuse-AI song path: {err}") from err
 
@@ -298,7 +305,7 @@ class AudioMusePlugin(MetadataProvider):
         """
         tracks = await self.song_path(start_item_id, end_item_id, max_steps)
         if not tracks:
-            raise ProviderUnavailableError("AudioMuse-AI found no path between these tracks")
+            raise InvalidDataError("AudioMuse-AI found no path between these tracks")
         playlist = await self.mass.music.playlists.create_playlist(
             name or _safe_name(f"Song path: {tracks[0].name} → {tracks[-1].name}")
         )
