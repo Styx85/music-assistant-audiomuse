@@ -14,7 +14,8 @@ It runs next to Music Assistant's other similarity sources (Last.fm, Sonic Simil
 a *metadata* provider: Music Assistant asks metadata providers for similar tracks before
 plugin providers, sorted by priority. With priority 10 it is asked before Last.fm (50) and
 Sonic Similarity (plugin), and Music Assistant falls back to those when AudioMuse-AI has no
-answer or is unreachable.
+answer or is unreachable. With *Fall back to Sonic Similarity* (default) the provider asks
+Sonic Similarity itself, so Last.fm is only used when neither has an answer.
 
 > Status: **alpha**. Tested against a fake AudioMuse-AI server; first runs against a real
 > Music Assistant 2.10 / AudioMuse-AI setup are pending.
@@ -70,6 +71,7 @@ and, for text search, **AudioMuse-AI Text Search** (plugin).
 | Option | Default | Meaning |
 | --- | --- | --- |
 | Ask AudioMuse-AI first | on | priority 10 (before Last.fm and Sonic Similarity), otherwise 60 |
+| Fall back to Sonic Similarity instead of Last.fm | on | when AudioMuse-AI has no answer, ask Sonic Similarity directly; Last.fm only when both have nothing |
 | Limit songs per artist | AudioMuse-AI default | AudioMuse-AI `eliminate_duplicates` |
 | Also match mood | AudioMuse-AI default | AudioMuse-AI `mood_similarity` |
 | Look up unmatched tracks by artist and title | on | fallback for unknown seeds |

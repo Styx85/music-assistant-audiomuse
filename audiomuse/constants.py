@@ -17,6 +17,8 @@ CONF_ELIMINATE_DUPLICATES: Final = "eliminate_duplicates"
 CONF_MOOD_SIMILARITY: Final = "mood_similarity"
 CONF_TITLE_ARTIST_FALLBACK: Final = "title_artist_fallback"
 CONF_PREFER_OVER_BUILTIN: Final = "prefer_over_builtin"
+CONF_SONIC_FALLBACK: Final = "sonic_fallback"
+SONIC_DOMAIN: Final = "sonic_similarity"
 
 # discover page row and status
 CONF_ENABLE_DISCOVER_ROW: Final = "enable_discover_row"

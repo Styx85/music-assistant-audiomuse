@@ -12,6 +12,10 @@
       "label": "Ask AudioMuse-AI first",
       "description": "Ask AudioMuse-AI for similar tracks before Last.fm and Sonic Similarity. If AudioMuse-AI has no answer, Music Assistant still falls back to them."
     },
+    "sonic_fallback": {
+      "label": "Fall back to Sonic Similarity instead of Last.fm",
+      "description": "If AudioMuse-AI has no answer (track not analyzed yet, index not built, server unreachable), ask Sonic Similarity directly, so Last.fm is only used when both have nothing."
+    },
     "server_name": {
       "label": "AudioMuse-AI music server",
       "description": "Name of the music server configured in AudioMuse-AI. Leave empty for its default server. It must be the Music Assistant server, because results are Music Assistant library ids."

@@ -16,6 +16,10 @@
       "label": "AudioMuse-AI zuerst fragen",
       "description": "Ähnliche Titel zuerst bei AudioMuse-AI anfragen, vor Last.fm und Sonic Similarity. Hat AudioMuse-AI keine Antwort, fällt Music Assistant auf diese zurück."
     },
+    "sonic_fallback": {
+      "label": "Rückfall auf Sonic Similarity statt Last.fm",
+      "description": "Hat AudioMuse-AI keine Antwort (Titel noch nicht analysiert, Index noch nicht gebaut, Server nicht erreichbar), wird direkt Sonic Similarity gefragt. Last.fm kommt dann nur noch zum Zug, wenn beide nichts haben."
+    },
     "server_name": {
       "label": "AudioMuse-AI-Musikserver",
       "description": "Name des in AudioMuse-AI eingerichteten Musikservers. Leer lassen für dessen Standardserver. Es muss der Music-Assistant-Server sein, denn die Ergebnisse sind Music-Assistant-Bibliotheks-IDs."

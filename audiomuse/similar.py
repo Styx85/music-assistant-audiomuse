@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Generic, Protocol, TypeVar
 
@@ -242,3 +243,31 @@ class SimilarTracksService(Generic[T]):
                 return await self._library.get_track(item_id)
 
         return list(await asyncio.gather(*(_load(item_id) for item_id in ids)))
+
+
+async def with_fallback(
+    primary: Callable[[], Awaitable[list[T]]],
+    fallback: Callable[[], Awaitable[list[T]]] | None,
+) -> tuple[list[T], str, AudioMuseError | None]:
+    """
+    Return the primary result, or the fallback's when the primary has none or fails.
+
+    :param primary: Asks AudioMuse-AI; may raise AudioMuseError.
+    :param fallback: Asks another source (e.g. Sonic Similarity); None disables it. It must
+        not raise for expected failures and return an empty list instead.
+    :return: The tracks, their source ("audiomuse", "fallback" or "none") and the
+        AudioMuse-AI error that led to the fallback, if any.
+    :raises AudioMuseError: The primary error, when neither source has an answer.
+    """
+    error: AudioMuseError | None = None
+    try:
+        tracks = await primary()
+    except AudioMuseError as err:
+        tracks, error = [], err
+    if tracks:
+        return tracks, "audiomuse", None
+    if fallback is not None and (other := await fallback()):
+        return other, "fallback", error
+    if error is not None:
+        raise error
+    return [], "none", None
