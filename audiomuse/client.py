@@ -93,7 +93,7 @@ class AudioMuseClient:
         Initialize the client.
 
         :param session: Shared aiohttp session (owned by the caller).
-        :param base_url: Base URL of AudioMuse-AI, e.g. ``http://192.168.178.60:8000``.
+        :param base_url: Base URL of AudioMuse-AI, e.g. ``http://audiomuse:8000``.
         :param api_token: AudioMuse-AI ``API_TOKEN``; sent as Bearer token when set.
         :param server: Optional AudioMuse-AI music server name; omitted means default server.
         :param timeout: Total timeout per request in seconds.
