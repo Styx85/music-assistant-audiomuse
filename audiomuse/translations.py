@@ -37,20 +37,36 @@ def flatten(data: dict[str, Any], prefix: str) -> dict[str, str]:
     return out
 
 
-def load_strings(package_dir: Path, domain: str) -> dict[str, dict[str, str]]:
+def load_strings(
+    package_dir: Path, domain: str, logger: logging.Logger | None = None
+) -> dict[str, dict[str, str]]:
     """
     Return ``{language: {fully-qualified key: text}}`` for a provider package.
 
+    Unreadable or malformed files are skipped (with a warning) without affecting the others.
+
     :param package_dir: The provider's folder (holding ``strings.json``).
     :param domain: The provider domain used in the key prefix.
+    :param logger: Logger for skipped files.
     """
     prefix = f"provider.{domain}."
+    files = [("en", package_dir / "strings.json")]
+    files += [(p.stem, p) for p in sorted((package_dir / "translations").glob("*.json"))]
     result: dict[str, dict[str, str]] = {}
-    source = package_dir / "strings.json"
-    if source.is_file():
-        result["en"] = flatten(json.loads(source.read_text(encoding="utf-8")), prefix)
-    for path in sorted((package_dir / "translations").glob("*.json")):
-        result[path.stem] = flatten(json.loads(path.read_text(encoding="utf-8")), prefix)
+    for language, path in files:
+        if not path.is_file():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as err:
+            if logger:
+                logger.warning("Skipping translation file %s: %s", path.name, err)
+            continue
+        if not isinstance(data, dict):
+            if logger:
+                logger.warning("Skipping translation file %s: not a JSON object", path.name)
+            continue
+        result[language] = flatten(data, prefix)
     return result
 
 
@@ -72,18 +88,17 @@ async def register_translations(
     if not isinstance(source, dict) or not isinstance(locales, dict):
         logger.debug("Translation controller layout unknown; provider texts stay untranslated")
         return False
-    try:
-        strings = load_strings(package_dir, domain)
-    except (OSError, ValueError) as err:
-        logger.warning("Could not read provider translations: %s", err)
-        return False
+    strings = load_strings(package_dir, domain, logger)
     for language, texts in strings.items():
         if language == "en":
             source.update(texts)
             continue
         # load Music Assistant's own bundle first: a pre-filled entry would stop it from
         # ever loading the full language file
-        await controller.ensure_locale_loaded(language)
-        bundle = locales.setdefault(language, {})
-        bundle.update(texts)
-    return True
+        try:
+            await controller.ensure_locale_loaded(language)
+        except Exception as err:  # noqa: BLE001 - never block the provider setup on texts
+            logger.debug("Could not load Music Assistant's %s bundle: %s", language, err)
+            continue
+        locales.setdefault(language, {}).update(texts)
+    return bool(strings)

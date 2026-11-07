@@ -65,3 +65,16 @@ def test_register_merges_after_loading_the_full_bundle(run) -> None:
 def test_register_skips_unknown_controller_layout(run) -> None:
     mass = SimpleNamespace(translations=SimpleNamespace())
     assert not run(register_translations(mass, PACKAGE_DIR, "audiomuse", logging.getLogger("t")))
+
+
+def test_broken_language_file_does_not_affect_others(tmp_path: Path) -> None:
+    (tmp_path / "strings.json").write_text('{"manifest": {"description": "EN"}}')
+    (tmp_path / "translations").mkdir()
+    (tmp_path / "translations" / "de.json").write_text("[]")
+    (tmp_path / "translations" / "fr.json").write_text("{broken")
+    (tmp_path / "translations" / "nl.json").write_text('{"manifest": {"description": "NL"}}')
+    strings = load_strings(tmp_path, "x", logging.getLogger("t"))
+    assert strings == {
+        "en": {"provider.x.manifest.description": "EN"},
+        "nl": {"provider.x.manifest.description": "NL"},
+    }
