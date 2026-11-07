@@ -107,6 +107,9 @@
     },
     "status_task": {
       "label": "Running: {0} ({1})"
+    },
+    "status_updated": {
+      "label": "As of {0}"
     }
   },
   "manifest": {

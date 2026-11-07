@@ -6,6 +6,7 @@ import asyncio
 import contextvars
 import re
 import time
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from aiohttp import ClientError
@@ -579,9 +580,9 @@ class AudioMusePlugin(MetadataProvider):
             summary = await self._client.dashboard_summary()
             active = await self._client.active_task()
         except AudioMuseError as err:
-            self._status = status_lines(self._version, None, None, str(err))
+            self._status = status_lines(self._version, None, None, str(err), _now_hhmm())
             return
-        self._status = status_lines(self._version, summary, active)
+        self._status = status_lines(self._version, summary, active, updated_at=_now_hhmm())
         try:
             self._anchors = await self._client.anchors()
             self._mood_centroid = pick_mood_centroids(await self._client.mood_centroids())
@@ -595,6 +596,11 @@ class AudioMusePlugin(MetadataProvider):
             radius_similarity=_tristate(self.config.get_value(CONF_RADIUS_SIMILARITY)),
             title_artist_fallback=bool(self.config.get_value(CONF_TITLE_ARTIST_FALLBACK)),
         )
+
+
+def _now_hhmm() -> str:
+    """Return the current local time as HH:MM (the server's time zone)."""
+    return datetime.now().astimezone().strftime("%H:%M")
 
 
 def _safe_name(name: str) -> str:

@@ -62,3 +62,13 @@ def test_pick_mood_centroids() -> None:
         "relaxed": [],
     }
     assert pick_mood_centroids(centroids) == {"happy": 3}
+
+
+def test_status_updated_time_line() -> None:
+    lines = status_lines("v1", None, None, "timeout", updated_at="14:35")
+    assert [(line.key, line.params) for line in lines] == [
+        ("status_unreachable", ["timeout"]),
+        ("status_updated", ["14:35"]),
+    ]
+    assert lines[-1].text == "As of 14:35"
+    assert [line.key for line in status_lines("v1", None, None)] == ["status_pending"]

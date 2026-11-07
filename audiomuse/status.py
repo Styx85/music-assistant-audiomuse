@@ -29,6 +29,7 @@ def status_lines(
     summary: dict[str, Any] | None,
     active: dict[str, Any] | None,
     error: str | None = None,
+    updated_at: str | None = None,
 ) -> list[StatusLine]:
     """
     Return the status as translatable lines for the provider settings page.
@@ -37,7 +38,20 @@ def status_lines(
     :param summary: Result of ``/api/dashboard/summary``.
     :param active: Result of ``/api/active_tasks`` (None when idle).
     :param error: Last connection error, if the status could not be fetched.
+    :param updated_at: Local time of this status (e.g. "14:35"), added as its own line.
     """
+    lines = _status_lines(version, summary, active, error)
+    if updated_at:
+        lines.append(StatusLine("status_updated", [updated_at], "As of {0}"))
+    return lines
+
+
+def _status_lines(
+    version: str | None,
+    summary: dict[str, Any] | None,
+    active: dict[str, Any] | None,
+    error: str | None,
+) -> list[StatusLine]:
     if error:
         return [StatusLine("status_unreachable", [error], "AudioMuse-AI not reachable: {0}")]
     if summary is None:

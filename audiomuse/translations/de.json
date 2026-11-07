@@ -107,6 +107,9 @@
     },
     "status_task": {
       "label": "Läuft: {0} ({1})"
+    },
+    "status_updated": {
+      "label": "Stand: {0} Uhr"
     }
   },
   "config_categories": {
