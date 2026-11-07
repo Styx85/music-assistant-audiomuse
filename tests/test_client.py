@@ -152,7 +152,7 @@ def test_find_path_and_text_search(run) -> None:
         async with serve(build_audiomuse_app(state)) as (url, session):
             client = AudioMuseClient(session, url, api_token=TOKEN)
             path = await client.find_path("11", "19", max_steps=8)
-            found = await client.text_search("ruhiges Klavier", limit=1)
+            found = await client.text_search("calm piano", limit=1)
         assert [r.item_id for r in path] == ["12", "13"]
         assert [r.item_id for r in found] == ["12"]
         path_query = next(q for p, q, _ in state.requests if p == "/api/find_path")

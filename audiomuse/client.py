@@ -175,7 +175,7 @@ class AudioMuseClient:
         """
         Return tracks whose CLAP audio embedding matches a free-text description.
 
-        :param query: Free text, e.g. "ruhiges Klavier am Abend".
+        :param query: Free text, e.g. "calm piano in the evening".
         :param limit: Maximum number of tracks.
         """
         data = await self._request(
