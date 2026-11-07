@@ -86,6 +86,27 @@
     "enable_alchemy_rows": {
       "label": "Alchemy-Zeilen auf der Entdecken-Seite anzeigen",
       "description": "Eine Zeile je in AudioMuse-AI gespeichertem Alchemy-Anker (gebaut auf der Alchemy-Seite von AudioMuse-AI)."
+    },
+    "status_unreachable": {
+      "label": "AudioMuse-AI nicht erreichbar: {0}"
+    },
+    "status_pending": {
+      "label": "AudioMuse-AI: Status wird abgefragt"
+    },
+    "status_summary": {
+      "label": "AudioMuse-AI {0} · {1} Titel analysiert · Textsuche-Index: {2} Titel"
+    },
+    "status_summary_no_text_index": {
+      "label": "AudioMuse-AI {0} · {1} Titel analysiert · Textsuche-Index: leer"
+    },
+    "status_wrong_server": {
+      "label": "Achtung: Standardserver von AudioMuse-AI ist {0}, nicht Music Assistant"
+    },
+    "status_analysis_albums": {
+      "label": "Analyse läuft: Album {0} von {1}"
+    },
+    "status_task": {
+      "label": "Läuft: {0} ({1})"
     }
   },
   "config_categories": {

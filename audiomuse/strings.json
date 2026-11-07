@@ -86,6 +86,27 @@
     "enable_alchemy_rows": {
       "label": "Show alchemy rows on the discover page",
       "description": "One row per alchemy anchor saved in AudioMuse-AI (build them in AudioMuse-AI's Alchemy page)."
+    },
+    "status_unreachable": {
+      "label": "AudioMuse-AI not reachable: {0}"
+    },
+    "status_pending": {
+      "label": "AudioMuse-AI: status pending"
+    },
+    "status_summary": {
+      "label": "AudioMuse-AI {0} · {1} songs analyzed · text search index: {2} songs"
+    },
+    "status_summary_no_text_index": {
+      "label": "AudioMuse-AI {0} · {1} songs analyzed · text search index: empty"
+    },
+    "status_wrong_server": {
+      "label": "Warning: AudioMuse-AI's default server is {0}, not Music Assistant"
+    },
+    "status_analysis_albums": {
+      "label": "Analysis running: album {0} of {1}"
+    },
+    "status_task": {
+      "label": "Running: {0} ({1})"
     }
   },
   "manifest": {

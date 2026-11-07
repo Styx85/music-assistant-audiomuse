@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from audiomuse.status import format_status
+from audiomuse.status import format_status, status_lines
 
 
 def test_status_with_running_analysis() -> None:
@@ -14,28 +14,39 @@ def test_status_with_running_analysis() -> None:
         }
     }
     active = {"task_type": "main_analysis", "details": {"status_message": "Albums 7/50"}}
+    lines = status_lines("v3.7.1", summary, active)
+    assert [(line.key, line.params) for line in lines] == [
+        ("status_summary", ["v3.7.1", "1234", "1200"]),
+        ("status_analysis_albums", ["7", "50"]),
+    ]
     assert format_status("v3.7.1", summary, active) == (
-        "AudioMuse-AI v3.7.1 · 1,234 songs analyzed · text search index: 1,200 · "
-        "main analysis running: Albums 7/50"
+        "AudioMuse-AI v3.7.1 · 1234 songs analyzed · text search index: 1200 songs · "
+        "Analysis running: album 7 of 50"
     )
 
 
-def test_status_idle_empty_and_wrong_server() -> None:
+def test_status_idle_empty_index_wrong_server_and_other_task() -> None:
     summary = {
         "content": {
             "total_songs": 0,
             "music_servers": [{"is_default": True, "server_type": "jellyfin"}],
         }
     }
-    text = format_status(None, summary, None)
-    assert text.startswith("AudioMuse-AI · 0 songs analyzed · text search index: empty")
-    assert "default server is jellyfin" in text
+    active = {"task_type": "server_sweep", "details": {"status_message": "Matching"}}
+    lines = status_lines(None, summary, active)
+    assert [line.key for line in lines] == [
+        "status_summary_no_text_index",
+        "status_wrong_server",
+        "status_task",
+    ]
+    assert lines[1].params == ["jellyfin"]
+    assert lines[2].text == "Running: server sweep (Matching)"
 
 
 def test_status_pending_and_error() -> None:
     assert format_status(None, None, None) == "AudioMuse-AI: status pending"
     assert format_status("v1", None, None, "timeout") == "AudioMuse-AI not reachable: timeout"
-    assert "0 songs" in format_status("v1", {"content": {"total_songs": "x"}}, None)
+    assert status_lines("v1", {"content": {"total_songs": "x"}}, None)[0].params[1] == "0"
 
 
 def test_pick_mood_centroids() -> None:

@@ -62,7 +62,7 @@ from .constants import (
 )
 from .library import MassLibraryPort, track_to_seed
 from .similar import SimilarOptions, SimilarTracksService, with_fallbacks
-from .status import format_status, pick_mood_centroids
+from .status import StatusLine, pick_mood_centroids, status_lines
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -105,7 +105,7 @@ class AudioMusePlugin(MetadataProvider):
         self._client: AudioMuseClient
         self._service: SimilarTracksService[Track]
         self._version: str | None = None
-        self._status_text = format_status(None, None, None)
+        self._status: list[StatusLine] = status_lines(None, None, None)
         self._status_task: asyncio.Task[None] | None = None
         # keyed by the seed ids: recently played is per user, so users never share entries
         self._discover_cache: dict[tuple[str, ...], tuple[float, list[Track]]] = {}
@@ -203,12 +203,17 @@ class AudioMusePlugin(MetadataProvider):
                 required=False,
                 category="discover",
             ),
-            ConfigEntry(
-                key=CONF_LABEL_STATUS,
-                type=ConfigEntryType.LABEL,
-                label=self._status_text,
-                required=False,
-                category="status",
+            *(
+                ConfigEntry(
+                    key=f"{CONF_LABEL_STATUS}_{index}",
+                    type=ConfigEntryType.LABEL,
+                    label=line.text,
+                    translation_key=line.key,
+                    translation_params=line.params,
+                    required=False,
+                    category="status",
+                )
+                for index, line in enumerate(self._status)
             ),
         )
 
@@ -569,9 +574,9 @@ class AudioMusePlugin(MetadataProvider):
             summary = await self._client.dashboard_summary()
             active = await self._client.active_task()
         except AudioMuseError as err:
-            self._status_text = format_status(self._version, None, None, str(err))
+            self._status = status_lines(self._version, None, None, str(err))
             return
-        self._status_text = format_status(self._version, summary, active)
+        self._status = status_lines(self._version, summary, active)
         try:
             self._anchors = await self._client.anchors()
             self._mood_centroid = pick_mood_centroids(await self._client.mood_centroids())

@@ -2,7 +2,93 @@
 
 from __future__ import annotations
 
+import re
+from dataclasses import dataclass, field
 from typing import Any
+
+
+_ALBUMS_RE = re.compile(r"Albums\s+(\d+)\s*/\s*(\d+)")
+
+
+@dataclass(frozen=True, slots=True)
+class StatusLine:
+    """One translatable status line: translation slug, placeholder values, English fallback."""
+
+    key: str
+    params: list[str] = field(default_factory=list)
+    fallback: str = ""
+
+    @property
+    def text(self) -> str:
+        """Return the English text with the placeholders filled in."""
+        return self.fallback.format(*self.params)
+
+
+def status_lines(
+    version: str | None,
+    summary: dict[str, Any] | None,
+    active: dict[str, Any] | None,
+    error: str | None = None,
+) -> list[StatusLine]:
+    """
+    Return the status as translatable lines for the provider settings page.
+
+    :param version: AudioMuse-AI version, if known.
+    :param summary: Result of ``/api/dashboard/summary``.
+    :param active: Result of ``/api/active_tasks`` (None when idle).
+    :param error: Last connection error, if the status could not be fetched.
+    """
+    if error:
+        return [StatusLine("status_unreachable", [error], "AudioMuse-AI not reachable: {0}")]
+    if summary is None:
+        return [StatusLine("status_pending", [], "AudioMuse-AI: status pending")]
+    content = summary.get("content") or {}
+    songs = str(_int(content.get("total_songs")))
+    clap = _int(content.get("clap_indexed"))
+    name = version or "?"
+    if clap:
+        lines = [
+            StatusLine(
+                "status_summary",
+                [name, songs, str(clap)],
+                "AudioMuse-AI {0} · {1} songs analyzed · text search index: {2} songs",
+            )
+        ]
+    else:
+        lines = [
+            StatusLine(
+                "status_summary_no_text_index",
+                [name, songs],
+                "AudioMuse-AI {0} · {1} songs analyzed · text search index: empty",
+            )
+        ]
+    servers = content.get("music_servers") or []
+    default = next((s for s in servers if isinstance(s, dict) and s.get("is_default")), None)
+    if default and default.get("server_type") != "musicassistant":
+        lines.append(
+            StatusLine(
+                "status_wrong_server",
+                [str(default.get("server_type"))],
+                "Warning: AudioMuse-AI's default server is {0}, not Music Assistant",
+            )
+        )
+    if active:
+        details = active.get("details") or {}
+        message = str(
+            details.get("status_message") or details.get("message") or active.get("status") or ""
+        )
+        if match := _ALBUMS_RE.search(message):
+            lines.append(
+                StatusLine(
+                    "status_analysis_albums",
+                    [match.group(1), match.group(2)],
+                    "Analysis running: album {0} of {1}",
+                )
+            )
+        else:
+            task = str(active.get("task_type") or "task").replace("_", " ")
+            lines.append(StatusLine("status_task", [task, message], "Running: {0} ({1})"))
+    return lines
 
 
 def format_status(
@@ -12,33 +98,14 @@ def format_status(
     error: str | None = None,
 ) -> str:
     """
-    Return a single-line status text.
+    Return the status as one English line (for logs).
 
     :param version: AudioMuse-AI version, if known.
     :param summary: Result of ``/api/dashboard/summary``.
     :param active: Result of ``/api/active_tasks`` (None when idle).
     :param error: Last connection error, if the status could not be fetched.
     """
-    if error:
-        return f"AudioMuse-AI not reachable: {error}"
-    if summary is None:
-        return "AudioMuse-AI: status pending"
-    content = summary.get("content") or {}
-    parts = [f"AudioMuse-AI {version}" if version else "AudioMuse-AI"]
-    songs = _int(content.get("total_songs"))
-    parts.append(f"{songs:,} songs analyzed")
-    clap = _int(content.get("clap_indexed"))
-    parts.append(f"text search index: {clap:,}" if clap else "text search index: empty")
-    servers = content.get("music_servers") or []
-    default = next((s for s in servers if isinstance(s, dict) and s.get("is_default")), None)
-    if default and default.get("server_type") != "musicassistant":
-        parts.append(f"warning: default server is {default.get('server_type')}")
-    if active:
-        details = active.get("details") or {}
-        message = details.get("status_message") or details.get("message") or active.get("status")
-        task = str(active.get("task_type") or "task").replace("_", " ")
-        parts.append(f"{task} running: {message}")
-    return " · ".join(parts)
+    return " · ".join(line.text for line in status_lines(version, summary, active, error))
 
 
 def pick_mood_centroids(centroids: dict[str, list[dict[str, Any]]]) -> dict[str, int]:
