@@ -9,9 +9,12 @@ type), so the track ids it returns are Music Assistant library ids.
 
 from __future__ import annotations
 
+import logging
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .provider import SUPPORTED_FEATURES, AudioMusePlugin
+from .translations import register_translations
 
 if TYPE_CHECKING:
     from music_assistant_models.config_entries import ProviderConfig
@@ -25,4 +28,7 @@ async def setup(
     mass: MusicAssistant, manifest: ProviderManifest, config: ProviderConfig
 ) -> ProviderInstanceType:
     """Initialize provider instance with given configuration."""
+    await register_translations(
+        mass, Path(__file__).parent, manifest.domain, logging.getLogger(__name__)
+    )
     return AudioMusePlugin(mass, manifest, config, set(SUPPORTED_FEATURES))

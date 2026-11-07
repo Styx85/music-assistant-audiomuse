@@ -1,0 +1,60 @@
+{
+  "config_entries": {
+    "url": {
+      "label": "AudioMuse-AI-URL",
+      "description": "Basis-URL von AudioMuse-AI, z. B. http://audiomuse:8000"
+    },
+    "api_token": {
+      "label": "API-Token",
+      "description": "Das in AudioMuse-AI eingerichtete API_TOKEN (Bearer-Token für Plugins)."
+    },
+    "clear_api_token": {
+      "label": "Gespeichertes API-Token entfernen",
+      "description": "Anhaken, wenn AudioMuse-AI kein Token mehr verlangt."
+    },
+    "prefer_over_builtin": {
+      "label": "AudioMuse-AI zuerst fragen",
+      "description": "Ähnliche Titel zuerst bei AudioMuse-AI anfragen, vor Last.fm und Sonic Similarity. Hat AudioMuse-AI keine Antwort, fällt Music Assistant auf diese zurück."
+    },
+    "server_name": {
+      "label": "AudioMuse-AI-Musikserver",
+      "description": "Name des in AudioMuse-AI eingerichteten Musikservers. Leer lassen für dessen Standardserver. Es muss der Music-Assistant-Server sein, denn die Ergebnisse sind Music-Assistant-Bibliotheks-IDs."
+    },
+    "verify_ssl": {
+      "label": "SSL-Zertifikat prüfen"
+    },
+    "eliminate_duplicates": {
+      "label": "Titel je Künstler begrenzen",
+      "description": "Begrenzt, wie viele Titel desselben Künstlers in den Ergebnissen vorkommen.",
+      "options": {
+        "server_default": "Standard von AudioMuse-AI",
+        "on": "An",
+        "off": "Aus"
+      }
+    },
+    "mood_similarity": {
+      "label": "Auch Stimmung abgleichen",
+      "description": "Ergebnisse zusätzlich nach Stimmungsmerkmalen filtern (tanzbar, fröhlich, entspannt, traurig …).",
+      "options": {
+        "server_default": "Standard von AudioMuse-AI",
+        "on": "An",
+        "off": "Aus"
+      }
+    },
+    "title_artist_fallback": {
+      "label": "Unbekannte Titel über Künstler und Titel suchen",
+      "description": "Kennt AudioMuse-AI den Titel nicht (noch nicht analysiert oder ein Streaming-Titel), wird stattdessen nach Künstler und Titel gefragt."
+    },
+    "enable_discover_row": {
+      "label": "„Inspiriert von kürzlich gespielten Titeln“ auf der Entdecken-Seite anzeigen",
+      "description": "Eine Zeile mit Titeln, die AudioMuse-AI ähnlich zu deinen zuletzt gespielten Titeln findet."
+    }
+  },
+  "config_categories": {
+    "discover": "Entdecken",
+    "status": "Status"
+  },
+  "manifest": {
+    "description": "Ähnliche Titel und Radio-Modus von einem selbst betriebenen AudioMuse-AI-Klanganalyse-Server."
+  }
+}

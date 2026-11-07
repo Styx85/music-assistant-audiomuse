@@ -8,12 +8,15 @@ connection of its own: it uses the AudioMuse-AI metadata provider (domain ``audi
 
 from __future__ import annotations
 
+import logging
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from music_assistant_models.enums import MediaType, ProviderFeature
 from music_assistant_models.media_items import SearchResults
 
 from music_assistant.models.plugin import PluginProvider
+from music_assistant.providers.audiomuse.translations import register_translations
 
 if TYPE_CHECKING:
     from music_assistant_models.config_entries import ProviderConfig
@@ -30,6 +33,9 @@ async def setup(
     mass: MusicAssistant, manifest: ProviderManifest, config: ProviderConfig
 ) -> ProviderInstanceType:
     """Initialize provider instance with given configuration."""
+    await register_translations(
+        mass, Path(__file__).parent, manifest.domain, logging.getLogger(__name__)
+    )
     return AudioMuseSearchPlugin(mass, manifest, config, set(SUPPORTED_FEATURES))
 
 

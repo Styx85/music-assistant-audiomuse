@@ -25,7 +25,8 @@
         "server_default": "AudioMuse-AI default",
         "on": "On",
         "off": "Off"
-      }
+      },
+      "description": "Limit how many tracks of the same artist appear in the results."
     },
     "mood_similarity": {
       "label": "Also match mood",
@@ -33,7 +34,8 @@
         "server_default": "AudioMuse-AI default",
         "on": "On",
         "off": "Off"
-      }
+      },
+      "description": "Also filter results by mood features (danceable, happy, relaxed, sad, ...)."
     },
     "title_artist_fallback": {
       "label": "Look up unmatched tracks by artist and title",
