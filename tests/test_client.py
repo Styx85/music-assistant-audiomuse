@@ -174,3 +174,17 @@ def test_long_token_is_redacted_before_truncation(run) -> None:
         assert len(str(err.value)) <= 400
 
     run(scenario())
+
+
+def test_dashboard_summary_and_active_task(run) -> None:
+    async def scenario() -> None:
+        state = FakeState()
+        async with serve(build_audiomuse_app(state)) as (url, session):
+            client = AudioMuseClient(session, url, api_token=TOKEN)
+            summary = await client.dashboard_summary()
+            assert summary["content"]["total_songs"] == 44
+            assert await client.active_task() is None  # idle: AudioMuse-AI answers {}
+            state.active_task = {"task_id": "t1", "task_type": "main_analysis"}
+            assert (await client.active_task())["task_id"] == "t1"
+
+    run(scenario())

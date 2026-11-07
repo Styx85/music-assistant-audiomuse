@@ -1,0 +1,6 @@
+{
+  "config_entries": {},
+  "manifest": {
+    "description": "Find tracks by describing their sound (e.g. \"calm piano in the evening\"), using AudioMuse-AI's CLAP index."
+  }
+}

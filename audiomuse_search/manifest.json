@@ -1,0 +1,15 @@
+{
+  "type": "plugin",
+  "domain": "audiomuse_search",
+  "stage": "alpha",
+  "name": "AudioMuse-AI Text Search",
+  "description": "Find tracks by describing their sound (e.g. \"calm piano in the evening\"), using AudioMuse-AI's CLAP index.",
+  "codeowners": ["@Styx85"],
+  "requirements": [],
+  "credits": ["[AudioMuse-AI](https://github.com/NeptuneHub/AudioMuse-AI)"],
+  "documentation": "https://github.com/Styx85/music-assistant-audiomuse",
+  "depends_on": "audiomuse",
+  "multi_instance": false,
+  "builtin": false,
+  "icon": "text-search"
+}

@@ -14,7 +14,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Generic, Protocol, TypeVar
 
-from .client import AudioMuseClient, AudioMuseNotFoundError
+from .client import AudioMuseClient, AudioMuseError, AudioMuseNotFoundError, SimilarTrack
 from .constants import MAX_REQUEST_N, OVERFETCH_FACTOR, RESOLVE_CONCURRENCY
 
 T = TypeVar("T")
@@ -156,6 +156,83 @@ class SimilarTracksService(Generic[T]):
             stats.returned,
         )
         return result
+
+    async def inspired_by(
+        self,
+        seeds: list[SeedRef],
+        limit: int,
+        per_seed: int,
+        options: SimilarOptions | None = None,
+        timeout: float = 20.0,
+    ) -> list[T]:
+        """
+        Return tracks similar to several seeds (e.g. recently played), most recent seed first.
+
+        All seeds are asked at once within ``timeout``; seeds AudioMuse-AI does not know or
+        that do not answer in time are skipped, the seeds themselves are never returned.
+        Raises the first AudioMuse error only when no seed produced any result.
+
+        :param seeds: Seed tracks, most important first (only library seeds are used).
+        :param limit: Maximum number of tracks to return.
+        :param per_seed: Neighbours to request per seed.
+        :param options: Request options.
+        :param timeout: Time budget for all AudioMuse-AI requests together, in seconds.
+        """
+        opts = options or SimilarOptions()
+        seed_ids = list(dict.fromkeys(s.library_id for s in seeds if s.library_id))
+        if limit <= 0 or not seed_ids:
+            return []
+        errors: list[AudioMuseError] = []
+
+        async def _ask(seed_id: str) -> list[SimilarTrack]:
+            try:
+                async with asyncio.timeout(timeout):
+                    return await self._client.similar_tracks(
+                        item_id=seed_id,
+                        n=min(MAX_REQUEST_N, per_seed + 1),
+                        eliminate_duplicates=opts.eliminate_duplicates,
+                        mood_similarity=opts.mood_similarity,
+                    )
+            except (AudioMuseNotFoundError, TimeoutError):
+                return []
+            except AudioMuseError as err:
+                errors.append(err)
+                return []
+
+        per_seed_rows = await asyncio.gather(*(_ask(seed_id) for seed_id in seed_ids))
+        if errors and not any(per_seed_rows):
+            raise errors[0]
+        seen = set(seed_ids)
+        ids: list[str] = []
+        for rows in per_seed_rows:
+            for row in rows:
+                if row.item_id not in seen:
+                    seen.add(row.item_id)
+                    ids.append(row.item_id)
+        ids = ids[: limit * OVERFETCH_FACTOR]
+        tracks = [t for t in await self._load_all(ids) if t is not None]
+        return tracks[:limit]
+
+    async def text_search(self, query: str, limit: int) -> list[T]:
+        """
+        Return library tracks whose sound matches a free-text description (CLAP search).
+
+        Errors (including "text index not built yet") propagate, so callers can avoid
+        caching a failure as an empty result.
+
+        :param query: Free text, e.g. "calm piano in the evening".
+        :param limit: Maximum number of tracks.
+        """
+        query = query.strip()
+        if not query or limit <= 0:
+            return []
+        try:
+            rows = await self._client.text_search(query, limit=min(MAX_REQUEST_N, limit * 2))
+        except AudioMuseNotFoundError:
+            return []
+        ids = list(dict.fromkeys(row.item_id for row in rows))
+        tracks = [t for t in await self._load_all(ids) if t is not None]
+        return tracks[:limit]
 
     async def _load_all(self, ids: list[str]) -> list[T | None]:
         semaphore = asyncio.Semaphore(RESOLVE_CONCURRENCY)

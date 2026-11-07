@@ -116,6 +116,20 @@ class AudioMuseClient:
             return str(data["app_version"])
         return None
 
+    async def dashboard_summary(self) -> dict[str, Any]:
+        """Return AudioMuse-AI's dashboard summary (analyzed songs, CLAP index, servers)."""
+        data = await self._request("GET", "/api/dashboard/summary")
+        if not isinstance(data, dict):
+            raise AudioMuseError("unexpected response from /api/dashboard/summary")
+        return data
+
+    async def active_task(self) -> dict[str, Any] | None:
+        """Return the running main task (e.g. an analysis), or None when idle."""
+        data = await self._request("GET", "/api/active_tasks")
+        if isinstance(data, dict) and data.get("task_id"):
+            return data
+        return None
+
     async def similar_tracks(
         self,
         *,

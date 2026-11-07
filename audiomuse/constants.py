@@ -18,6 +18,16 @@ CONF_MOOD_SIMILARITY: Final = "mood_similarity"
 CONF_TITLE_ARTIST_FALLBACK: Final = "title_artist_fallback"
 CONF_PREFER_OVER_BUILTIN: Final = "prefer_over_builtin"
 
+# discover page row and status
+CONF_ENABLE_DISCOVER_ROW: Final = "enable_discover_row"
+CONF_LABEL_STATUS: Final = "label_status"
+DISCOVER_ROW_ID: Final = "audiomuse_inspired_by_recently_played"
+DISCOVER_SEED_COUNT: Final = 5
+DISCOVER_PER_SEED: Final = 10
+DISCOVER_ITEM_LIMIT: Final = 12
+DISCOVER_CACHE_SECONDS: Final = 300
+STATUS_REFRESH_SECONDS: Final = 300
+
 # tri-state choices for options AudioMuse-AI can decide itself
 TRISTATE_SERVER_DEFAULT: Final = "server_default"
 TRISTATE_ON: Final = "on"

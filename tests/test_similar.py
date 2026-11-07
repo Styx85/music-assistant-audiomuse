@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 
 import pytest
@@ -115,3 +116,87 @@ def test_limit_zero_and_request_cap(run) -> None:
     assert client.calls == []
     run(service.similar_tracks(SeedRef("S", ["A"], library_id="1"), 500))
     assert client.calls[0]["n"] == 200
+
+
+class SeedClient:
+    """Answers per seed id; text search returns fixed rows or raises."""
+
+    def __init__(self, by_seed, text_rows=None, text_error=None):
+        self.by_seed = by_seed
+        self.text_rows = text_rows or []
+        self.text_error = text_error
+        self.calls: list[dict] = []
+
+    async def similar_tracks(self, **kwargs):
+        self.calls.append(kwargs)
+        result = self.by_seed.get(kwargs["item_id"], [])
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    async def text_search(self, query, limit=25):
+        self.calls.append({"query": query, "limit": limit})
+        if self.text_error:
+            raise self.text_error
+        return self.text_rows
+
+
+def test_inspired_by_merges_seeds_in_order_and_skips_unknown(run) -> None:
+    client = SeedClient(
+        {
+            "1": [_row("10"), _row("2"), _row("11")],
+            "2": AudioMuseNotFoundError("nope", 404),
+            "3": [_row("11"), _row("12"), _row("1")],
+        }
+    )
+    service = SimilarTracksService(client, FakeLibrary({"10", "11", "12"}))
+    seeds = [SeedRef("a", ["A"], "1"), SeedRef("b", ["B"], "2"), SeedRef("s", ["S"]),
+             SeedRef("c", ["C"], "3")]
+    result = run(service.inspired_by(seeds, limit=10, per_seed=5))
+    assert [t.item_id for t in result] == ["10", "11", "12"]  # seeds 1-3 never returned
+    assert [c["item_id"] for c in client.calls] == ["1", "2", "3"]
+    assert client.calls[0]["n"] == 6
+
+
+def test_inspired_by_limits_and_handles_no_seeds(run) -> None:
+    client = SeedClient({"1": [_row(str(i)) for i in range(10, 30)]})
+    service = SimilarTracksService(client, FakeLibrary({str(i) for i in range(10, 30)}))
+    assert len(run(service.inspired_by([SeedRef("a", ["A"], "1")], limit=3, per_seed=20))) == 3
+    assert run(service.inspired_by([SeedRef("s", ["S"])], limit=3, per_seed=5)) == []
+    assert run(service.inspired_by([SeedRef("a", ["A"], "1")], limit=0, per_seed=5)) == []
+
+
+def test_text_search(run) -> None:
+    client = SeedClient({}, text_rows=[_row("7"), _row("7"), _row("404"), _row("8")])
+    service = SimilarTracksService(client, FakeLibrary({"7", "8"}))
+    assert [t.item_id for t in run(service.text_search("  calm piano ", 5))] == ["7", "8"]
+    assert client.calls[0] == {"query": "calm piano", "limit": 10}
+    assert run(service.text_search("   ", 5)) == []
+
+
+def test_text_search_errors_propagate_so_they_are_not_cached(run) -> None:
+    client = SeedClient({}, text_error=AudioMuseUnavailableError("CLAP cache not loaded", 503))
+    service = SimilarTracksService(client, FakeLibrary({"7"}))
+    with pytest.raises(AudioMuseUnavailableError):
+        run(service.text_search("piano", 5))
+
+
+def test_inspired_by_keeps_partial_results_on_errors_and_timeouts(run) -> None:
+    class SlowClient(SeedClient):
+        async def similar_tracks(self, **kwargs):
+            if kwargs["item_id"] == "slow":
+                await asyncio.sleep(1)
+            return await super().similar_tracks(**kwargs)
+
+    client = SlowClient({"1": [_row("10")], "2": AudioMuseUnavailableError("down", 500)})
+    service = SimilarTracksService(client, FakeLibrary({"10"}))
+    seeds = [SeedRef("s", ["S"], "slow"), SeedRef("a", ["A"], "1"), SeedRef("b", ["B"], "2")]
+    result = run(service.inspired_by(seeds, limit=5, per_seed=5, timeout=0.05))
+    assert [t.item_id for t in result] == ["10"]
+
+
+def test_inspired_by_raises_when_every_seed_fails(run) -> None:
+    client = SeedClient({"1": AudioMuseUnavailableError("down", 500)})
+    service = SimilarTracksService(client, FakeLibrary(set()))
+    with pytest.raises(AudioMuseUnavailableError):
+        run(service.inspired_by([SeedRef("a", ["A"], "1")], limit=5, per_seed=5))

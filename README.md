@@ -3,7 +3,12 @@
 A [Music Assistant](https://music-assistant.io) provider that uses a self-hosted
 [AudioMuse-AI](https://github.com/NeptuneHub/AudioMuse-AI) server for **similar tracks**.
 That powers Music Assistant's *Similar tracks*, **radio mode** and **autoplay "similar"**
-with AudioMuse-AI's sonic analysis (MusiCNN + CLAP).
+with AudioMuse-AI's sonic analysis (MusiCNN + CLAP), plus:
+
+- a discover row **"Inspired by recently played"** (tracks similar to what you played last),
+- **free-text search** by sound ("calm piano in the evening") via the companion
+  `audiomuse_search` plugin,
+- a **status line** in the settings (songs analyzed, text index, running analysis).
 
 It runs next to Music Assistant's other similarity sources (Last.fm, Sonic Similarity). It is
 a *metadata* provider: Music Assistant asks metadata providers for similar tracks before
@@ -37,15 +42,21 @@ to asking by artist and title.
 ## Install (manual, until it is part of Music Assistant)
 
 Music Assistant only loads providers from its own package folder. For the Docker image,
-mount the `audiomuse` folder into it, e.g. in `compose.yml`:
+mount both folders of this repo into it, e.g. in `compose.yml`:
 
 ```yaml
     volumes:
-      - ./providers/audiomuse:/app/venv/lib/python3.14/site-packages/music_assistant/providers/audiomuse:ro
+      - ./music-assistant-audiomuse/audiomuse:/app/venv/lib/python3.14/site-packages/music_assistant/providers/audiomuse:ro
+      - ./music-assistant-audiomuse/audiomuse_search:/app/venv/lib/python3.14/site-packages/music_assistant/providers/audiomuse_search:ro
 ```
 
+`audiomuse_search` is optional. It exists because Music Assistant's global search only asks
+plugin providers, while the main provider must be a metadata provider (see above). It has no
+settings and uses the main provider's connection.
+
 Check the Python version in the path for your image (`docker exec music-assistant ls /app/venv/lib`).
-Restart Music Assistant, then add **AudioMuse-AI** under *Settings → Providers* (metadata).
+Restart Music Assistant, then add **AudioMuse-AI** under *Settings → Providers* (metadata)
+and, for text search, **AudioMuse-AI Text Search** (plugin).
 
 ### Setup
 
@@ -62,6 +73,7 @@ Restart Music Assistant, then add **AudioMuse-AI** under *Settings → Providers
 | Limit songs per artist | AudioMuse-AI default | AudioMuse-AI `eliminate_duplicates` |
 | Also match mood | AudioMuse-AI default | AudioMuse-AI `mood_similarity` |
 | Look up unmatched tracks by artist and title | on | fallback for unknown seeds |
+| Show "Inspired by recently played" | on | discover row from the last 5 played tracks (cached 5 min) |
 
 ## Behaviour and errors
 
@@ -74,9 +86,8 @@ Restart Music Assistant, then add **AudioMuse-AI** under *Settings → Providers
 
 ## Roadmap
 
-1. Similar tracks / radio / autoplay (this release)
-2. Free-text search ("calm piano in the evening") via `ProviderFeature.SEARCH`, a discover row
-   via `ProviderFeature.RECOMMENDATIONS`, song path between two tracks
+1. Similar tracks / radio / autoplay, discover row, free-text search, status (this release)
+2. More similarity options (radius walk, mood anchors), song path between two tracks
 3. Alchemy, sonic fingerprint, mood playlists
 
 ## Development

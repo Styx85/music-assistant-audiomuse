@@ -26,6 +26,7 @@ class FakeState:
 
     requests: list[tuple[str, dict[str, str], dict[str, str]]] = field(default_factory=list)
     similar_status: int = 200
+    active_task: dict[str, Any] = field(default_factory=dict)
 
 
 def _auth_ok(request: web.Request) -> bool:
@@ -74,6 +75,14 @@ def build_audiomuse_app(state: FakeState) -> web.Application:
         rows = SIMILAR_ROWS[: int(body.get("limit", 2))]
         return web.json_response({"query": body["query"], "results": rows, "count": len(rows)})
 
+    async def summary(request: web.Request) -> web.Response:
+        await record(request)
+        return web.json_response({"content": {"total_songs": 44, "clap_indexed": 40}})
+
+    async def active(request: web.Request) -> web.Response:
+        await record(request)
+        return web.json_response(state.active_task)
+
     async def not_json(request: web.Request) -> web.Response:
         await record(request)
         return web.Response(text="<html>proxy error</html>", content_type="text/html")
@@ -85,6 +94,8 @@ def build_audiomuse_app(state: FakeState) -> web.Application:
     app.router.add_get("/api/find_path", find_path)
     app.router.add_post("/api/clap/search", clap)
     app.router.add_get("/api/not_json", not_json)
+    app.router.add_get("/api/dashboard/summary", summary)
+    app.router.add_get("/api/active_tasks", active)
     return app
 
 

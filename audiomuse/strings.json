@@ -42,9 +42,17 @@
     "clear_api_token": {
       "label": "Remove the saved API token",
       "description": "Tick this if AudioMuse-AI no longer requires a token."
+    },
+    "enable_discover_row": {
+      "label": "Show 'Inspired by recently played' on the discover page",
+      "description": "A discover row with tracks AudioMuse-AI finds similar to your recently played tracks."
     }
   },
   "manifest": {
     "description": "Similar tracks and radio mode from a self-hosted AudioMuse-AI sonic analysis server."
+  },
+  "config_categories": {
+    "discover": "Discover",
+    "status": "Status"
   }
 }
